@@ -1,0 +1,108 @@
+# QUICK START - Deploy and Test Your App
+
+## Status: ✅ BUILD COMPLETE
+
+**APK Ready**: `app/build/outputs/apk/debug/app-debug.apk` (11.4 MB)
+
+---
+
+## Step-by-Step Deployment
+
+### 1. Prepare Phone (One-Time)
+```bash
+# On your Windows computer:
+# Enable USB Debugging on phone:
+Settings → About Phone → Tap Build Number 7x → Developer Options → USB Debugging ON
+```
+
+### 2. Connect and Install
+```bash
+# In PowerShell:
+cd "C:\Users\epeterson\Downloads\axisight-3_patched_usb\axisight-3"
+
+# Install APK
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# Launch app
+adb shell am start -n com.etrsystems.axisight/.MainActivity
+```
+
+### 3. Test USB Camera
+1. App shows **built-in camera preview** ✅
+2. Click **USB Camera button**
+3. **Grant permission** when asked
+4. **Camera preview appears** (640x480 VGA resolution)
+5. See **smooth video** at ~15 fps
+
+---
+
+## What Was Fixed
+
+| Problem | Fix |
+|---------|-----|
+| Build failed with "invalid wrapper()" | Removed wrapper block |
+| "noCompress property not found" error | Updated to AGP 8.x API |
+| Gradle using stale cache | Disabled config cache |
+
+**Result**: ✅ Build succeeds, APK ready
+
+---
+
+## If Something Goes Wrong
+
+```bash
+# See what's happening:
+adb logcat | findstr "UvcFragment"
+
+# If app crashes, clear it:
+adb shell pm clear com.etrsystems.axisight
+
+# Full logs to file:
+adb logcat > logs.txt
+```
+
+---
+
+## Key Info
+
+- **App**: AxiSight USB Camera
+- **Version**: 0.1.0
+- **Min Android**: 8.0 (API 26)
+- **Target Android**: 15 (API 36)
+- **Architecture**: 64-bit ARM (arm64-v8a)
+
+---
+
+## Expected Results
+
+✅ App installs without errors
+✅ Built-in camera works
+✅ USB camera button responds
+✅ USB camera preview appears
+✅ No preview size errors
+✅ No black screens
+✅ Smooth 15+ fps video
+
+---
+
+## Documents to Read
+
+1. **FINAL_STATUS_REPORT.md** - Full build summary
+2. **DEPLOYMENT_GUIDE.md** - Detailed deployment steps
+3. **DETAILED_CHANGES.md** - Technical changes made
+
+---
+
+## Rebuild If Needed
+
+```bash
+cd C:\Users\epeterson\Downloads\axisight-3_patched_usb\axisight-3
+.\gradlew clean assembleDebug
+```
+
+New APK: `app/build/outputs/apk/debug/app-debug.apk`
+
+---
+
+**Ready to Deploy!** 🚀
+

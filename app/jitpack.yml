@@ -1,0 +1,5 @@
+jdk:
+  - openjdk17
+before_install:
+  - sdk install java 17.0.13-tem[[1](https://www.google.com/url?sa=E&q=https%3A%2F%2Fvertexaisearch.cloud.google.com%2Fgrounding-api-redirect%2FAUZIYQELMDeqycitgTv8YZNlIpK9d2uRniPx_e9fCgyLQydGOyYXZ1vw49HKexwjkuMsyCF4sj9DBPdkncqP9iSDdRiAV5KRxClz-1xgRTYvcIqkoQEGbZgA6qlf8mXO2W7IfzVu_cGWKcQNf45QH9nJEEtKDZ0llAXtseIcyzVIQ6xETLvA__VjaFTaevA8b-rBvNSuFcnzXbwrNUY%3D)]
+  - sdk use java 17.0.13-tem
