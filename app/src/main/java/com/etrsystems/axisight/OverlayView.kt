@@ -76,6 +76,11 @@ class OverlayView @JvmOverloads constructor(
 
     fun hideSimDot() { showSimDot = false; invalidate() }
 
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         // Log.v("OverlayView", "onDraw: w=$width h=$height") // Uncomment if needed, spammy

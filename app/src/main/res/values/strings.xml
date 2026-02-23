@@ -1,12 +1,29 @@
 <resources>
     <string name="app_name">AxiSight</string>
+    <string name="controls_title">Camera and Capture Controls</string>
     <string name="sim">Simulate</string>
     <string name="auto">Auto-Detect</string>
     <string name="calibrate">Calibrate</string>
     <string name="export_csv">Export CSV</string>
+    <string name="lock">Lock</string>
+    <string name="unlock">Unlock</string>
+    <string name="track_start">Start</string>
+    <string name="track_stop">Stop</string>
+    <string name="track_reset">Reset</string>
     <string name="internal">Internal</string>
     <string name="usb">USB</string>
     <string name="wifi">WiFi</string>
     <string name="wifi_url_hint">rtsp://</string>
     <string name="connect">Connect</string>
+    <string name="label_min_area">Minimum Area</string>
+    <string name="label_max_area">Maximum Area</string>
+    <string name="label_circularity">Minimum Circularity</string>
+    <string name="label_kstd">Noise Rejection (kStd)</string>
+    <string name="label_mm_per_px">mm/px</string>
+    <string name="label_known_mm">Known mm</string>
+    <string name="hint_mm_per_px">e.g. 0.02</string>
+    <string name="default_known_mm">10</string>
+    <string name="unset_value">unset</string>
+    <string name="params_summary">minA %1$d  maxA %2$d  circ&gt;=%3$s  kStd %4$s  mm/px %5$s</string>
+    <string name="params_summary_initial">minA 200  maxA 50000  circ&gt;=0.50  kStd 0.50  mm/px unset</string>
 </resources>

@@ -2,10 +2,11 @@
 package com.etrsystems.axisight.ui
 
 import android.graphics.Bitmap
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDevice
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.Looper
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -19,7 +20,6 @@ import com.etrsystems.axisight.R
 import com.jiangdg.ausbc.base.CameraFragment
 import com.jiangdg.ausbc.callback.ICameraStateCallBack
 import com.jiangdg.ausbc.camera.bean.CameraRequest
-import com.jiangdg.ausbc.widget.AspectRatioTextureView
 import com.jiangdg.ausbc.widget.IAspectRatio
 
 class UvcFragment : CameraFragment() {
@@ -28,20 +28,42 @@ class UvcFragment : CameraFragment() {
         fun onPointDetected(x: Float, y: Float)
     }
 
-    private var textureView: AspectRatioTextureView? = null
+    interface CameraStateListener {
+        fun onUsbCameraOpened()
+        fun onUsbCameraClosed()
+        fun onUsbCameraError(message: String?)
+    }
+
+    private var textureView: SafeAspectRatioTextureView? = null
     private var callback: DetectionCallback? = null
-    
-    // Default to VGA (640x480) - Safer for initial embedded test
+    private var cameraStateListener: CameraStateListener? = null
+    private var targetVendorId: Int = -1
+    private var targetProductId: Int = -1
+    private var targetDeviceName: String? = null
+
+    // Default to VGA (640x480) for broad USB camera compatibility.
     private var previewWidth: Int = 640
     private var previewHeight: Int = 480
-    
+
     private var processingThread: HandlerThread? = null
     private var processingHandler: Handler? = null
     private var isProcessing = false
+    private var frameBitmap: Bitmap? = null
     private val detectorConfig = DetectorConfig()
 
     fun setDetectionCallback(cb: DetectionCallback) {
         this.callback = cb
+    }
+
+    fun setCameraStateListener(listener: CameraStateListener?) {
+        cameraStateListener = listener
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        targetVendorId = arguments?.getInt(ARG_VENDOR_ID, -1) ?: -1
+        targetProductId = arguments?.getInt(ARG_PRODUCT_ID, -1) ?: -1
+        targetDeviceName = arguments?.getString(ARG_DEVICE_NAME)
     }
 
     /**
@@ -54,12 +76,12 @@ class UvcFragment : CameraFragment() {
             detectorConfig.lockedThreshold = null
             return null
         }
-        
+
         // Capture current center pixel
         val bmp = textureView?.bitmap ?: return null
         val w = bmp.width
         val h = bmp.height
-        if (w > 0 && h > 0) {
+        val result = if (w > 0 && h > 0) {
             // Sample center 5x5 area for robust color
             val cx = w / 2
             val cy = h / 2
@@ -79,9 +101,20 @@ class UvcFragment : CameraFragment() {
             val thr = (lum + margin).coerceIn(0, 255)
             detectorConfig.lockedThreshold = thr
             Log.i(TAG, "Target LOCKED: centerLum=$lum, thr=$thr")
-            return thr
+            thr
+        } else {
+            null
         }
-        return null
+
+        bmp.recycle()
+        return result
+    }
+
+    private fun recycleFrameBitmap() {
+        frameBitmap?.let {
+            if (!it.isRecycled) it.recycle()
+        }
+        frameBitmap = null
     }
 
     override fun getRootView(inflater: LayoutInflater, container: ViewGroup?): View {
@@ -89,7 +122,7 @@ class UvcFragment : CameraFragment() {
             val view = inflater.inflate(R.layout.fragment_uvc, container, false)
             textureView = view.findViewById(R.id.uvc_texture_view)
             textureView?.setAspectRatio(previewWidth, previewHeight)
-            Log.d(TAG, "Root view inflated")
+            Log.d(TAG, "Root view inflated (${previewWidth}x${previewHeight})")
             view
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing camera view", e)
@@ -106,15 +139,45 @@ class UvcFragment : CameraFragment() {
         return view as? ViewGroup ?: FrameLayout(requireContext())
     }
 
+    override fun getDefaultCamera(): UsbDevice? {
+        val devices = getDeviceList().orEmpty()
+        if (devices.isEmpty()) return null
+
+        targetDeviceName?.let { expectedName ->
+            devices.firstOrNull { it.deviceName == expectedName }?.let {
+                Log.i(TAG, "Using USB camera by deviceName: $expectedName")
+                return it
+            }
+        }
+
+        if (targetVendorId >= 0 && targetProductId >= 0) {
+            devices.firstOrNull {
+                it.vendorId == targetVendorId &&
+                    it.productId == targetProductId &&
+                    isUvcDevice(it)
+            }?.let {
+                Log.i(TAG, "Using USB camera by VID/PID: ${it.vendorId}/${it.productId}")
+                return it
+            }
+        }
+
+        return devices.firstOrNull { isUvcDevice(it) }?.also {
+            Log.w(TAG, "Falling back to first UVC device: ${it.deviceName}")
+        } ?: devices.first().also {
+            Log.w(TAG, "Falling back to first USB device: ${it.deviceName}")
+        }
+    }
+
     override fun getCameraRequest(): CameraRequest {
         return CameraRequest.Builder()
             .setPreviewWidth(previewWidth)
             .setPreviewHeight(previewHeight)
             .setRenderMode(CameraRequest.RenderMode.OPENGL)
-            //.setDefaultCameraId(0) // Removed: undefined reference
-            .setAudioSource(CameraRequest.AudioSource.SOURCE_AUTO)
+            .setAudioSource(CameraRequest.AudioSource.NONE)
+            .setPreviewFormat(CameraRequest.PreviewFormat.FORMAT_MJPEG)
             .setAspectRatioShow(true)
             .setCaptureRawImage(false)
+            .setRawPreviewData(false)
             .create()
     }
 
@@ -128,17 +191,22 @@ class UvcFragment : CameraFragment() {
                 Log.i(TAG, "Camera opened successfully")
                 activity?.runOnUiThread {
                     Toast.makeText(context, "USB Camera Connected", Toast.LENGTH_SHORT).show()
+                    cameraStateListener?.onUsbCameraOpened()
                 }
                 startProcessing()
             }
             ICameraStateCallBack.State.CLOSED -> {
                 Log.i(TAG, "Camera closed")
+                activity?.runOnUiThread {
+                    cameraStateListener?.onUsbCameraClosed()
+                }
                 stopProcessing()
             }
             ICameraStateCallBack.State.ERROR -> {
                 Log.e(TAG, "Camera error: $msg")
                 activity?.runOnUiThread {
                     Toast.makeText(context, "Camera Error: $msg", Toast.LENGTH_LONG).show()
+                    cameraStateListener?.onUsbCameraError(msg)
                 }
                 stopProcessing()
             }
@@ -156,6 +224,15 @@ class UvcFragment : CameraFragment() {
         super.onPause()
     }
 
+    override fun onDestroyView() {
+        stopProcessing()
+        stopProcessingThread()
+        recycleFrameBitmap()
+        cameraStateListener = null
+        textureView = null
+        super.onDestroyView()
+    }
+
     private fun startProcessingThread() {
         if (processingThread == null) {
             processingThread = HandlerThread("FrameProcessingThread")
@@ -165,6 +242,7 @@ class UvcFragment : CameraFragment() {
     }
 
     private fun stopProcessingThread() {
+        recycleFrameBitmap()
         processingThread?.quitSafely()
         processingThread = null
         processingHandler = null
@@ -183,18 +261,16 @@ class UvcFragment : CameraFragment() {
 
     private fun processFrame() {
         if (!isProcessing) return
-        
+
         processingHandler?.postDelayed({
             if (!isProcessing) return@postDelayed
             
             try {
-                // Log.d(TAG, "Processing frame...") // Uncomment for verbose logging
-                // Warning: getBitmap() is slow, but acceptable for < 30fps analysis
-                val bmp = textureView?.bitmap
+                val bmp = obtainFrameBitmap()
                 if (bmp != null) {
                     processBitmap(bmp)
                 } else {
-                    android.util.Log.w(TAG, "TextureView bitmap is null - Surface not ready?")
+                    Log.w(TAG, "TextureView bitmap unavailable - surface not ready?")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Frame processing error", e)
@@ -203,6 +279,21 @@ class UvcFragment : CameraFragment() {
                 if (isProcessing) processFrame()
             }
         }, 66) // ~15 FPS
+    }
+
+    private fun obtainFrameBitmap(): Bitmap? {
+        val tv = textureView ?: return null
+        val w = tv.width
+        val h = tv.height
+        if (w <= 0 || h <= 0) return null
+
+        val reusable = frameBitmap
+        if (reusable == null || reusable.isRecycled || reusable.width != w || reusable.height != h) {
+            recycleFrameBitmap()
+            frameBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        }
+        val target = frameBitmap ?: return null
+        return tv.getBitmap(target)
     }
 
     private fun processBitmap(bmp: Bitmap) {
@@ -225,12 +316,32 @@ class UvcFragment : CameraFragment() {
         } catch (e: Exception) {
             Log.e(TAG, "Detection error", e)
         }
-        // No explicit recycle needed as we don't own the bitmap creation policy of textureView.bitmap?
-        // Actually textureView.getBitmap() creates a new bitmap. We should let GC handle it or recycle it if we are sure.
-        // For safety/simplicity, let GC handle it.
+    }
+
+    private fun isUvcDevice(device: UsbDevice): Boolean {
+        if (device.deviceClass == UsbConstants.USB_CLASS_VIDEO) return true
+        for (i in 0 until device.interfaceCount) {
+            if (device.getInterface(i).interfaceClass == UsbConstants.USB_CLASS_VIDEO) {
+                return true
+            }
+        }
+        return false
     }
 
     companion object {
         private const val TAG = "UvcFragment"
+        private const val ARG_VENDOR_ID = "vendor_id"
+        private const val ARG_PRODUCT_ID = "product_id"
+        private const val ARG_DEVICE_NAME = "device_name"
+
+        fun newInstance(vendorId: Int, productId: Int, deviceName: String?): UvcFragment {
+            return UvcFragment().apply {
+                arguments = Bundle().apply {
+                    putInt(ARG_VENDOR_ID, vendorId)
+                    putInt(ARG_PRODUCT_ID, productId)
+                    putString(ARG_DEVICE_NAME, deviceName)
+                }
+            }
+        }
     }
 }

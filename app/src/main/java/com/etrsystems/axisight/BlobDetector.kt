@@ -74,8 +74,10 @@ object BlobDetector {
             thr = cfg.lockedThreshold!!
             // android.util.Log.d(TAG, "Using LOCKED threshold: $thr")
         } else {
-             // Percentile Threshold (darkest 1%)
-            val targetCount = (pixelCount * 0.01).toInt().coerceAtLeast(1)
+            // Use the darker tail, capped by configured max area to avoid selecting most of frame.
+            val onePercentCount = (pixelCount * 0.01).toInt().coerceAtLeast(1)
+            val maxAreaCount = (cfg.maxAreaPx / (ds * ds).coerceAtLeast(1)).coerceAtLeast(1)
+            val targetCount = min(onePercentCount, maxAreaCount)
             var cumulative = 0
             for (k in 0..255) {
                 cumulative += histogram[k]
@@ -209,8 +211,10 @@ object BlobDetector {
         if (cfg.lockedThreshold != null) {
             thr = cfg.lockedThreshold!!
         } else {
-            // Percentile Threshold (darkest 1%)
-            val targetCount = (pixelCount * 0.01).toInt().coerceAtLeast(1)
+            // Use the darker tail, capped by configured max area to avoid selecting most of frame.
+            val onePercentCount = (pixelCount * 0.01).toInt().coerceAtLeast(1)
+            val maxAreaCount = (cfg.maxAreaPx / (ds * ds).coerceAtLeast(1)).coerceAtLeast(1)
+            val targetCount = min(onePercentCount, maxAreaCount)
             var cumulative = 0
             for (k in 0..255) {
                 cumulative += histogram[k]

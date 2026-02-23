@@ -1,7 +1,11 @@
 <resources>
-    <color name="axisight_bg">#0B2A3E</color>
-    <color name="axisight_ring">#5EC8F8</color>
-    <color name="axisight_orbit">#77B4D9</color>
+    <color name="axisight_bg">#EAF2F7</color>
+    <color name="axisight_ring">#0F6D89</color>
+    <color name="axisight_orbit">#7AB1C8</color>
     <color name="axisight_white">#FFFFFF</color>
-    <color name="axisight_marker">#111111</color>
+    <color name="axisight_marker">#14212A</color>
+    <color name="axisight_surface">#F7FBFD</color>
+    <color name="axisight_accent">#D7752F</color>
+    <color name="axisight_text">#132B38</color>
+    <color name="axisight_scrim">#9A0D1F2A</color>
 </resources>

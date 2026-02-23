@@ -1,10 +1,20 @@
 package com.etrsystems.axisight
 
 import android.Manifest
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.SurfaceTexture
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
+import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
@@ -17,16 +27,26 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.etrsystems.axisight.databinding.ActivityMainBinding
 import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.rtsp.RtspMediaSource
+import java.util.Locale
 import kotlin.math.*
 
+@UnstableApi
 class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private lateinit var b: ActivityMainBinding
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageAnalyzer: ImageAnalysis? = null
     private var exoPlayer: ExoPlayer? = null
+    private var usbPermissionReceiverRegistered = false
+    private var usbRecoveryReceiverRegistered = false
+    private var usbAttachReceiverRegistered = false
+    private var pendingUsbDeviceName: String? = null
+    private var usbPermissionRequestInFlight = false
+    private var lastUsbPermissionRequestMs = 0L
+    private val usbPermissionAction by lazy { "${BuildConfig.APPLICATION_ID}.USB_PERMISSION" }
 
     private enum class CameraSource { INTERNAL, WIFI, USB }
     private var cameraSource = CameraSource.INTERNAL
@@ -49,6 +69,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     // Manual Locking
     private var isLocked = false
     private var lockRequest = false
+    private var trackingEnabled = true
 
     private var csvLogger: CsvLogger? = null
 
@@ -58,10 +79,90 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         if (perms[Manifest.permission.CAMERA] == true) startCamera()
     }
 
+    private val usbPermissionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (cameraSource != CameraSource.USB || simulate) return
+            if (intent?.action != usbPermissionAction) return
+
+            val device = getUsbDeviceExtra(intent)
+            val expected = pendingUsbDeviceName
+            usbPermissionRequestInFlight = false
+            if (expected != null && device?.deviceName != expected) {
+                pendingUsbDeviceName = null
+                Log.w(
+                    TAG,
+                    "USB permission callback device changed. expected=$expected actual=${device?.deviceName}"
+                )
+                b.root.postDelayed({
+                    if (cameraSource == CameraSource.USB && !simulate) {
+                        startUsbCamera()
+                    }
+                }, USB_RECONNECT_DELAY_MS)
+                return
+            }
+            pendingUsbDeviceName = null
+
+            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+            if (!granted) {
+                Toast.makeText(
+                    this@MainActivity,
+                    "USB permission denied. Cannot open camera.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+
+            val opened = openPermittedUsbCamera(preferredDevice = device)
+            if (!opened) {
+                Log.w(TAG, "USB permission granted but no permitted UVC device was immediately available")
+                b.root.postDelayed({
+                    if (cameraSource == CameraSource.USB && !simulate) {
+                        startUsbCamera()
+                    }
+                }, USB_RECONNECT_DELAY_MS)
+            }
+        }
+    }
+
+    private val usbMonitorRecoveryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != AxisightApp.ACTION_USB_MONITOR_RACE) return
+            if (cameraSource != CameraSource.USB || simulate) return
+            if (usbPermissionRequestInFlight) return
+
+            stopUsbCamera()
+            b.root.postDelayed({
+                if (cameraSource == CameraSource.USB && !simulate) {
+                    startUsbCamera()
+                }
+            }, 500L)
+        }
+    }
+
+    private val usbAttachReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (cameraSource != CameraSource.USB || simulate) return
+            when (intent?.action) {
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                    b.root.postDelayed({
+                        if (cameraSource == CameraSource.USB && !simulate) {
+                            startUsbCamera()
+                        }
+                    }, USB_RECONNECT_DELAY_MS)
+                }
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                    stopUsbCamera()
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
+        registerUsbMonitorRecoveryReceiverIfNeeded()
+        registerUsbAttachReceiverIfNeeded()
 
         csvLogger = CsvLogger(this)
 
@@ -131,7 +232,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         
         b.btnLock.setOnClickListener {
             isLocked = !isLocked
-            b.btnLock.text = if (isLocked) "Unlock" else "Lock"
+            b.btnLock.text = if (isLocked) getString(R.string.unlock) else getString(R.string.lock)
             
             if (isLocked) {
                  // Trigger Lock
@@ -154,9 +255,34 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
         }
 
+        b.btnTrackStart.setOnClickListener {
+            trackingEnabled = true
+            updateTrackingButtons()
+        }
+
+        b.btnTrackStop.setOnClickListener {
+            trackingEnabled = false
+            updateTrackingButtons()
+        }
+
+        b.btnTrackReset.setOnClickListener {
+            b.overlay.clearPoints()
+        }
+
+        updateTrackingButtons()
+
         fun updateParamsText() {
-            val mmText = mmPerPx?.let { String.format("%.4f", it) } ?: "unset"
-            b.txtParams.text = "minA ${cfg.minAreaPx}  maxA ${cfg.maxAreaPx}  circ≥${"%.2f".format(cfg.minCircularity)}  kStd ${"%.2f".format(cfg.kStd)}  mm/px $mmText"
+            val mmText = mmPerPx?.let { String.format(Locale.US, "%.4f", it) } ?: getString(R.string.unset_value)
+            val circText = String.format(Locale.US, "%.2f", cfg.minCircularity)
+            val kStdText = String.format(Locale.US, "%.2f", cfg.kStd)
+            b.txtParams.text = getString(
+                R.string.params_summary,
+                cfg.minAreaPx,
+                cfg.maxAreaPx,
+                circText,
+                kStdText,
+                mmText
+            )
         }
         b.seekMinArea.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.minAreaPx = max(1, p); updateParamsText() })
         b.seekMaxArea.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.maxAreaPx = max(cfg.minAreaPx+1, p); updateParamsText() })
@@ -170,32 +296,43 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             updateParamsText()
             true
         }
-        b.edKnownMm.setText("10")
+        b.edKnownMm.setText(getString(R.string.default_known_mm))
         b.edKnownMm.setOnEditorActionListener { v, _, _ ->
             knownMm = v.text?.toString()?.toDoubleOrNull() ?: 10.0
             true
         }
 
-        b.overlay.setOnTouchListener { _, ev ->
-            if (ev.action == MotionEvent.ACTION_DOWN) {
-                val x = ev.x; val y = ev.y
-                if (calMode) {
-                    if (calP1 == null) calP1 = x to y
-                    else {
-                        val p1 = calP1!!
-                        val dp = hypot((x - p1.first).toDouble(), (y - p1.second).toDouble())
-                        if (dp > 0.0) {
-                            mmPerPx = knownMm / dp
-                            b.overlay.mmPerPx = mmPerPx
-                            updateParamsText()
+        b.overlay.setOnTouchListener { view, ev ->
+            when (ev.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    val x = ev.x
+                    val y = ev.y
+                    if (calMode) {
+                        if (calP1 == null) calP1 = x to y
+                        else {
+                            val p1 = calP1!!
+                            val dp = hypot((x - p1.first).toDouble(), (y - p1.second).toDouble())
+                            if (dp > 0.0) {
+                                mmPerPx = knownMm / dp
+                                b.overlay.mmPerPx = mmPerPx
+                                updateParamsText()
+                            }
+                            calP1 = null
+                            calMode = false
                         }
-                        calP1 = null; calMode = false
+                    } else if (!autoDetect || simulate) {
+                        if (trackingEnabled) {
+                            b.overlay.addPoint(x, y)
+                        }
                     }
-                } else if (!autoDetect || simulate) {
-                    b.overlay.addPoint(x, y)
+                    true
                 }
+                MotionEvent.ACTION_UP -> {
+                    view.performClick()
+                    true
+                }
+                else -> true
             }
-            true
         }
 
         if (!simulate) ensureCameraPermission { startCamera() }
@@ -206,14 +343,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         stopCamera()
         stopWifiCamera()
         stopUsbCamera()
+        unregisterUsbPermissionReceiverIfNeeded()
+        unregisterUsbMonitorRecoveryReceiverIfNeeded()
+        unregisterUsbAttachReceiverIfNeeded()
     }
 
     private fun ensureCameraPermission(onGranted: () -> Unit) {
         val cam = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val audio = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        
-        if (cam && audio) onGranted()
-        else camPerm.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
+        if (cam) onGranted()
+        else camPerm.launch(arrayOf(Manifest.permission.CAMERA))
     }
 
     private fun startCamera() {
@@ -282,7 +420,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                                 }
                                 
                                 val result = BlobDetector.detectDarkDotCenter(image, cfg)
-                                if (result is DetectionResult.Success) {
+                                if (result is DetectionResult.Success && trackingEnabled) {
                                     b.overlay.addPoint(result.x, result.y)
                                 }
                             }
@@ -302,6 +440,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+    @UnstableApi
     private fun startWifiCamera(url: String) {
         try {
             // Validate URL format
@@ -361,39 +500,192 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun startUsbCamera() {
         try {
-            val usbManager = getSystemService(android.content.Context.USB_SERVICE) as android.hardware.usb.UsbManager
-            if (usbManager.deviceList.isEmpty()) {
-                Toast.makeText(this, "No USB devices detected. Please check connection.", Toast.LENGTH_LONG).show()
-            }
-            
             b.previewView.visibility = View.GONE
             b.textureView.visibility = View.GONE
             b.usbCameraContainer.visibility = View.VISIBLE
-            
-            val currentFrag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer)
-            if (currentFrag == null) {
-                val uvcFragment = com.etrsystems.axisight.ui.UvcFragment()
-                uvcFragment.setDetectionCallback(object : com.etrsystems.axisight.ui.UvcFragment.DetectionCallback {
-                    override fun onPointDetected(x: Float, y: Float) {
-                        if (autoDetect && !simulate) {
-                             b.overlay.addPoint(x, y)
-                        }
-                    }
-                })
-                
-                supportFragmentManager.beginTransaction()
-                    .replace(R.id.usbCameraContainer, uvcFragment)
-                    .commit()
+
+            val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+            val uvcDevice = usbManager.deviceList.values.firstOrNull { isUvcDevice(it) }
+            if (uvcDevice == null) {
+                b.usbCameraContainer.visibility = View.GONE
+                Toast.makeText(this, "No USB camera detected.", Toast.LENGTH_LONG).show()
+                return
             }
+
+            if (!usbManager.hasPermission(uvcDevice)) {
+                if (usbPermissionRequestInFlight) {
+                    return
+                }
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastUsbPermissionRequestMs < USB_PERMISSION_RETRY_COOLDOWN_MS) {
+                    return
+                }
+                b.usbCameraContainer.visibility = View.GONE
+                usbPermissionRequestInFlight = true
+                lastUsbPermissionRequestMs = now
+                requestUsbPermission(usbManager, uvcDevice)
+                Toast.makeText(this, "Grant USB permission to continue.", Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            usbPermissionRequestInFlight = false
+            showUsbCameraFragment(uvcDevice)
         } catch (e: Exception) {
+            usbPermissionRequestInFlight = false
             Toast.makeText(this, "USB camera error: ${e.message}", Toast.LENGTH_LONG).show()
             android.util.Log.e("MainActivity", "USB camera start failed", e)
             stopUsbCamera()
         }
     }
 
+    private fun openPermittedUsbCamera(preferredDevice: UsbDevice?): Boolean {
+        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+        val chosen = sequenceOf(preferredDevice)
+            .filterNotNull()
+            .firstOrNull { isUvcDevice(it) && usbManager.hasPermission(it) }
+            ?: usbManager.deviceList.values.firstOrNull { isUvcDevice(it) && usbManager.hasPermission(it) }
+
+        if (chosen == null) {
+            return false
+        }
+        showUsbCameraFragment(chosen)
+        return true
+    }
+
+    private fun showUsbCameraFragment(device: UsbDevice) {
+        b.previewView.visibility = View.GONE
+        b.textureView.visibility = View.GONE
+        b.usbCameraContainer.visibility = View.VISIBLE
+
+        val uvcFragment = com.etrsystems.axisight.ui.UvcFragment.newInstance(
+            vendorId = device.vendorId,
+            productId = device.productId,
+            deviceName = device.deviceName
+        )
+        uvcFragment.setDetectionCallback(object : com.etrsystems.axisight.ui.UvcFragment.DetectionCallback {
+            override fun onPointDetected(x: Float, y: Float) {
+                if (autoDetect && !simulate && trackingEnabled) {
+                    b.overlay.addPoint(x, y)
+                }
+            }
+        })
+
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.usbCameraContainer, uvcFragment)
+            .commit()
+    }
+
+    private fun requestUsbPermission(usbManager: UsbManager, device: UsbDevice) {
+        registerUsbPermissionReceiverIfNeeded()
+        pendingUsbDeviceName = device.deviceName
+
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        val permissionIntent = PendingIntent.getBroadcast(
+            this,
+            1001,
+            Intent(usbPermissionAction).setPackage(packageName),
+            flags
+        )
+        usbManager.requestPermission(device, permissionIntent)
+    }
+
+    private fun registerUsbPermissionReceiverIfNeeded() {
+        if (usbPermissionReceiverRegistered) return
+        val filter = IntentFilter(usbPermissionAction)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbPermissionReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(usbPermissionReceiver, filter)
+        }
+        usbPermissionReceiverRegistered = true
+    }
+
+    private fun registerUsbMonitorRecoveryReceiverIfNeeded() {
+        if (usbRecoveryReceiverRegistered) return
+        val filter = IntentFilter(AxisightApp.ACTION_USB_MONITOR_RACE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbMonitorRecoveryReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(usbMonitorRecoveryReceiver, filter)
+        }
+        usbRecoveryReceiverRegistered = true
+    }
+
+    private fun registerUsbAttachReceiverIfNeeded() {
+        if (usbAttachReceiverRegistered) return
+        val filter = IntentFilter().apply {
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbAttachReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(usbAttachReceiver, filter)
+        }
+        usbAttachReceiverRegistered = true
+    }
+
+    private fun unregisterUsbPermissionReceiverIfNeeded() {
+        if (!usbPermissionReceiverRegistered) return
+        try {
+            unregisterReceiver(usbPermissionReceiver)
+        } catch (_: IllegalArgumentException) {
+            // Receiver may already be unregistered by lifecycle races.
+        } finally {
+            usbPermissionReceiverRegistered = false
+            pendingUsbDeviceName = null
+        }
+    }
+
+    private fun unregisterUsbMonitorRecoveryReceiverIfNeeded() {
+        if (!usbRecoveryReceiverRegistered) return
+        try {
+            unregisterReceiver(usbMonitorRecoveryReceiver)
+        } catch (_: IllegalArgumentException) {
+            // Receiver may already be unregistered by lifecycle races.
+        } finally {
+            usbRecoveryReceiverRegistered = false
+        }
+    }
+
+    private fun unregisterUsbAttachReceiverIfNeeded() {
+        if (!usbAttachReceiverRegistered) return
+        try {
+            unregisterReceiver(usbAttachReceiver)
+        } catch (_: IllegalArgumentException) {
+            // Receiver may already be unregistered by lifecycle races.
+        } finally {
+            usbAttachReceiverRegistered = false
+        }
+    }
+
+    private fun getUsbDeviceExtra(intent: Intent): UsbDevice? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+        }
+    }
+
+    private fun isUvcDevice(device: UsbDevice): Boolean {
+        if (device.deviceClass == UsbConstants.USB_CLASS_VIDEO) return true
+        for (i in 0 until device.interfaceCount) {
+            if (device.getInterface(i).interfaceClass == UsbConstants.USB_CLASS_VIDEO) {
+                return true
+            }
+        }
+        return false
+    }
+
     private fun stopUsbCamera() {
         try {
+            usbPermissionRequestInFlight = false
+            pendingUsbDeviceName = null
             b.usbCameraContainer.visibility = View.GONE
             val currentFrag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer)
             if (currentFrag != null) {
@@ -421,7 +713,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             val x = cx + simRadiusPx * cos(simAngle).toFloat()
             val y = cy + simRadiusPx * sin(simAngle).toFloat()
             b.overlay.setSimDot(x, y)
-            if (autoDetect) b.overlay.addPoint(x, y)
+            if (autoDetect && trackingEnabled) b.overlay.addPoint(x, y)
             b.previewView.postDelayed(this, 16L)
         }
     }
@@ -442,13 +734,24 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             if (cameraSource == CameraSource.WIFI && autoDetect) {
                 val bmp = b.textureView.bitmap ?: return
                 val result = BlobDetector.detectDarkDotCenter(bmp, cfg)
-                if (result is DetectionResult.Success) {
+                if (result is DetectionResult.Success && trackingEnabled) {
                     b.overlay.addPoint(result.x, result.y)
                 }
             }
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Texture frame analysis failed", e)
         }
+    }
+
+    private fun updateTrackingButtons() {
+        b.btnTrackStart.isEnabled = !trackingEnabled
+        b.btnTrackStop.isEnabled = trackingEnabled
+    }
+
+    companion object {
+        private const val TAG = "MainActivity"
+        private const val USB_RECONNECT_DELAY_MS = 600L
+        private const val USB_PERMISSION_RETRY_COOLDOWN_MS = 1500L
     }
 }
 

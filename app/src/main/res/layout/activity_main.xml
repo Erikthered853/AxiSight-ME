@@ -3,7 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/axisight_bg">
 
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
@@ -15,7 +16,7 @@
         android:id="@+id/textureView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone"/>
+        android:visibility="gone" />
 
     <FrameLayout
         android:id="@+id/usbCameraContainer"
@@ -23,222 +24,341 @@
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-
-
     <com.etrsystems.axisight.OverlayView
         android:id="@+id/overlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Reticle (Crosshair) - centered -->
     <ImageView
         android:id="@+id/reticle"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="center"
+        android:contentDescription="@null"
+        android:elevation="10dp"
+        android:importantForAccessibility="no"
         android:src="@drawable/ic_reticle"
-        android:visibility="visible"
-        android:elevation="10dp"/>
+        android:visibility="visible" />
 
-    <!-- Top controls -->
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="8dp"
-        android:background="#66000000">
+        android:layout_height="match_parent"
+        android:padding="12dp">
 
-        <RadioGroup
-            android:id="@+id/rgCameraSource"
-            android:layout_width="match_parent"
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/topControls"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            app:cardBackgroundColor="@color/axisight_scrim"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:strokeColor="@color/axisight_orbit"
+            app:strokeWidth="1dp">
 
-                        <RadioButton
-
-                            android:id="@+id/rbInternal"
-
-                            android:layout_width="wrap_content"
-
-                            android:layout_height="wrap_content"
-
-                            android:text="@string/internal"
-
-                            android:textColor="@android:color/white"
-
-                            android:checked="true"/>
-
-            
-
-                        <RadioButton
-
-                            android:id="@+id/rbUsb"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/usb"
-                            android:textColor="@android:color/white"/>
-
-            
-
-                        <RadioButton
-
-                            android:id="@+id/rbWifi"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/wifi"
-                android:textColor="@android:color/white"/>
-        </RadioGroup>
+                android:orientation="vertical"
+                android:padding="12dp">
 
-        <LinearLayout
-            android:id="@+id/wifiGroup"
-            android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="@string/controls_title"
+                    android:textColor="@color/axisight_white"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <RadioGroup
+                    android:id="@+id/rgCameraSource"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/rbInternal"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:checked="true"
+                        android:text="@string/internal"
+                        android:textColor="@color/axisight_white" />
+
+                    <RadioButton
+                        android:id="@+id/rbUsb"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/usb"
+                        android:textColor="@color/axisight_white" />
+
+                    <RadioButton
+                        android:id="@+id/rbWifi"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/wifi"
+                        android:textColor="@color/axisight_white" />
+                </RadioGroup>
+
+                <LinearLayout
+                    android:id="@+id/wifiGroup"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <EditText
+                        android:id="@+id/edWifiUrl"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:background="@android:drawable/edit_text"
+                        android:hint="@string/wifi_url_hint"
+                        android:importantForAutofill="no"
+                        android:inputType="textUri"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/axisight_marker"
+                        android:textColorHint="@color/axisight_orbit" />
+
+                    <Button
+                        android:id="@+id/btnWifiConnect"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/connect" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchSim"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/sim"
+                        android:textColor="@color/axisight_white" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchAuto"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:checked="true"
+                        android:text="@string/auto"
+                        android:textColor="@color/axisight_white" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnCal"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/calibrate" />
+
+                    <Button
+                        android:id="@+id/btnExport"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/export_csv" />
+
+                    <Button
+                        android:id="@+id/btnLock"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:backgroundTint="@color/axisight_accent"
+                        android:text="@string/lock" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnTrackStart"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/track_start" />
+
+                    <Button
+                        android:id="@+id/btnTrackStop"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/track_stop" />
+
+                    <Button
+                        android:id="@+id/btnTrackReset"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:text="@string/track_reset" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/tuningPanel"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:visibility="gone">
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="@color/axisight_scrim"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:strokeColor="@color/axisight_orbit"
+            app:strokeWidth="1dp">
 
-            <EditText
-                android:id="@+id/edWifiUrl"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="@string/wifi_url_hint"
-                android:inputType="textUri"/>
+                android:orientation="vertical"
+                android:padding="12dp">
 
-            <Button
-                android:id="@+id/btnWifiConnect"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/connect"/>
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/txtParams"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/params_summary_initial"
+                    android:textColor="@color/axisight_white"
+                    android:textSize="13sp" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_min_area"
+                    android:textColor="@color/axisight_white" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switchSim"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/sim"
-                android:textColor="@android:color/white"
-                android:layout_marginEnd="8dp"/>
+                <SeekBar
+                    android:id="@+id/seekMinArea"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:max="20000"
+                    android:progress="200" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switchAuto"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/auto"
-                android:textColor="@android:color/white"
-                android:checked="true"
-                android:layout_marginEnd="8dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_max_area"
+                    android:textColor="@color/axisight_white" />
 
-            <Button
-                android:id="@+id/btnCal"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/calibrate"
-                android:layout_marginEnd="8dp"/>
+                <SeekBar
+                    android:id="@+id/seekMaxArea"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:max="200000"
+                    android:progress="50000" />
 
-            <Button
-                android:id="@+id/btnExport"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/export_csv"
-                android:layout_marginEnd="8dp"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_circularity"
+                    android:textColor="@color/axisight_white" />
 
-            <Button
-                android:id="@+id/btnLock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Lock"
-                android:backgroundTint="#AA4444"/>
-        </LinearLayout>
-    </LinearLayout>
+                <SeekBar
+                    android:id="@+id/seekCirc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:max="100"
+                    android:progress="50" />
 
-    <!-- Bottom tuning panel -->
-    <LinearLayout
-        android:id="@+id/tuningPanel"
-        android:layout_gravity="bottom"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="#66000000"
-        android:padding="8dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/label_kstd"
+                    android:textColor="@color/axisight_white" />
 
-        <TextView
-            android:id="@+id/txtParams"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@android:color/white"
-            android:text="minA 200  maxA 8000  circ≥0.5  kStd 1.0  mm/px unset" />
+                <SeekBar
+                    android:id="@+id/seekKstd"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:max="300"
+                    android:progress="100" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-            <TextView android:text="minA" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white"/>
-            <SeekBar
-                android:id="@+id/seekMinArea"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:max="20000"
-                android:progress="200" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:text="@string/label_mm_per_px"
+                        android:textColor="@color/axisight_white" />
 
-            <TextView android:text="maxA" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white"/>
-            <SeekBar
-                android:id="@+id/seekMaxArea"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:max="50000"
-                android:progress="8000" />
-        </LinearLayout>
+                    <EditText
+                        android:id="@+id/edMmPerPx"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:background="@android:drawable/edit_text"
+                        android:hint="@string/hint_mm_per_px"
+                        android:importantForAutofill="no"
+                        android:inputType="numberDecimal"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/axisight_marker"
+                        android:textColorHint="@color/axisight_orbit" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <TextView android:text="circ" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white"/>
-            <SeekBar
-                android:id="@+id/seekCirc"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:max="100"
-                android:progress="50" />
-            <TextView android:text="kStd" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white"/>
-            <SeekBar
-                android:id="@+id/seekKstd"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:max="300"
-                android:progress="100" />
-        </LinearLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:text="@string/label_known_mm"
+                        android:textColor="@color/axisight_white" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <TextView android:text="mm/px" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white"/>
-            <EditText
-                android:id="@+id/edMmPerPx"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="e.g. 0.02" 
-                android:inputType="numberDecimal" />
-            <TextView android:text="known mm" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@android:color/white"/>
-            <EditText
-                android:id="@+id/edKnownMm"
-                android:layout_width="80dp"
-                android:layout_height="wrap_content"
-                android:hint="10"
-                android:inputType="numberDecimal" />
-        </LinearLayout>
-    </LinearLayout>
+                    <EditText
+                        android:id="@+id/edKnownMm"
+                        android:layout_width="72dp"
+                        android:layout_height="40dp"
+                        android:background="@android:drawable/edit_text"
+                        android:hint="@string/default_known_mm"
+                        android:importantForAutofill="no"
+                        android:inputType="numberDecimal"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/axisight_marker"
+                        android:textColorHint="@color/axisight_orbit" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </FrameLayout>
