@@ -21,6 +21,13 @@ class OverlayView @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         Log.d("OverlayView", "Size Changed: ${w}x${h}")
+        if (targetInitialized && w > 0 && h > 0) {
+            targetX = targetX.coerceIn(0f, w.toFloat())
+            targetY = targetY.coerceIn(0f, h.toFloat())
+            val maxRadius = maxOf(24f, minOf(w, h) * 0.5f)
+            targetRadiusPx = targetRadiusPx.coerceIn(24f, maxRadius)
+            notifyTargetChanged()
+        }
     }
 
     private val pts = ArrayDeque<Pair<Float, Float>>()
@@ -32,9 +39,29 @@ class OverlayView @JvmOverloads constructor(
     var showSimDot = false
     var simX = 0f
     var simY = 0f
+    var onTargetChanged: ((Float, Float, Float) -> Unit)? = null
+    private var calCenter: Pair<Float, Float>? = null
+    private var calUp: Pair<Float, Float>? = null
+    private var calScaleP1: Pair<Float, Float>? = null
+    private var calScaleP2: Pair<Float, Float>? = null
+    private var calPending: Pair<Float, Float>? = null
 
-    private val paintCross = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.RED; strokeWidth = 3f; style = Paint.Style.STROKE
+    var targetX = 0f
+        private set
+    var targetY = 0f
+        private set
+    var targetRadiusPx = 160f
+        private set
+    private var targetInitialized = false
+
+    private val paintTarget = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.GREEN
+        strokeWidth = 4f
+        style = Paint.Style.STROKE
+    }
+    private val paintTargetDot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.GREEN
+        style = Paint.Style.FILL
     }
     private val paintPts = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.GREEN; style = Paint.Style.FILL
@@ -47,6 +74,28 @@ class OverlayView @JvmOverloads constructor(
     }
     private val paintSim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK; style = Paint.Style.FILL
+    }
+    private val paintCalCenter = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.CYAN; style = Paint.Style.FILL
+    }
+    private val paintCalUp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.YELLOW; style = Paint.Style.FILL
+    }
+    private val paintCalScale = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.MAGENTA; style = Paint.Style.FILL
+    }
+    private val paintCalPending = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(220, 255, 165, 0); style = Paint.Style.FILL
+    }
+    private val paintCalLine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(220, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+    }
+    private val paintCalLabel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 24f
+        style = Paint.Style.FILL
     }
 
     fun clearPoints() {
@@ -76,6 +125,41 @@ class OverlayView @JvmOverloads constructor(
 
     fun hideSimDot() { showSimDot = false; invalidate() }
 
+    fun setCalibrationMarkers(
+        center: Pair<Float, Float>?,
+        up: Pair<Float, Float>?,
+        scaleP1: Pair<Float, Float>?,
+        scaleP2: Pair<Float, Float>?,
+        pending: Pair<Float, Float>?
+    ) {
+        calCenter = center
+        calUp = up
+        calScaleP1 = scaleP1
+        calScaleP2 = scaleP2
+        calPending = pending
+        invalidate()
+    }
+
+    fun setTargetCenter(x: Float, y: Float) {
+        targetInitialized = true
+        targetX = x.coerceIn(0f, width.toFloat().coerceAtLeast(1f))
+        targetY = y.coerceIn(0f, height.toFloat().coerceAtLeast(1f))
+        notifyTargetChanged()
+        invalidate()
+    }
+
+    fun setTargetRadius(radiusPx: Float) {
+        targetInitialized = true
+        val maxRadius = maxOf(24f, minOf(width, height) * 0.5f)
+        targetRadiusPx = radiusPx.coerceIn(24f, maxRadius)
+        notifyTargetChanged()
+        invalidate()
+    }
+
+    private fun notifyTargetChanged() {
+        onTargetChanged?.invoke(targetX, targetY, targetRadiusPx)
+    }
+
     override fun performClick(): Boolean {
         super.performClick()
         return true
@@ -87,12 +171,22 @@ class OverlayView @JvmOverloads constructor(
         val w = width; val h = height
         val cx = w / 2f; val cy = h / 2f
 
-        canvas.drawLine(cx - 40, cy, cx + 40, cy, paintCross)
-        canvas.drawLine(cx, cy - 40, cx, cy + 40, paintCross)
+        if (!targetInitialized && w > 0 && h > 0) {
+            targetInitialized = true
+            targetX = cx
+            targetY = cy
+            targetRadiusPx = minOf(w, h) * 0.2f
+            notifyTargetChanged()
+        }
+
+        canvas.drawCircle(targetX, targetY, targetRadiusPx, paintTarget)
+        canvas.drawCircle(targetX, targetY, 8f, paintTargetDot)
 
         if (showSimDot) {
             canvas.drawCircle(simX, simY, 8f, paintSim)
         }
+
+        drawCalibrationMarkers(canvas)
 
         synchronized(ptsLock) {
             for ((x, y) in pts) {
@@ -116,6 +210,32 @@ class OverlayView @JvmOverloads constructor(
                 }
             }
         }
+    }
+
+    private fun drawCalibrationMarkers(canvas: Canvas) {
+        val c = calCenter
+        val u = calUp
+        val s1 = calScaleP1
+        val s2 = calScaleP2
+        val p = calPending
+
+        if (c != null && u != null) {
+            canvas.drawLine(c.first, c.second, u.first, u.second, paintCalLine)
+        }
+        if (s1 != null && s2 != null) {
+            canvas.drawLine(s1.first, s1.second, s2.first, s2.second, paintCalLine)
+        }
+
+        c?.let { drawCalPoint(canvas, it, "C", paintCalCenter) }
+        u?.let { drawCalPoint(canvas, it, "U", paintCalUp) }
+        s1?.let { drawCalPoint(canvas, it, "S1", paintCalScale) }
+        s2?.let { drawCalPoint(canvas, it, "S2", paintCalScale) }
+        p?.let { drawCalPoint(canvas, it, "P", paintCalPending) }
+    }
+
+    private fun drawCalPoint(canvas: Canvas, point: Pair<Float, Float>, label: String, paint: Paint) {
+        canvas.drawCircle(point.first, point.second, 10f, paint)
+        canvas.drawText(label, point.first + 12f, point.second - 12f, paintCalLabel)
     }
 }
 

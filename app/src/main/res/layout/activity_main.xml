@@ -38,7 +38,7 @@
         android:elevation="10dp"
         android:importantForAccessibility="no"
         android:src="@drawable/ic_reticle"
-        android:visibility="visible" />
+        android:visibility="gone" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -255,32 +255,42 @@
                     android:textSize="13sp" />
 
                 <TextView
+                    android:id="@+id/txtDelta"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/label_min_area"
-                    android:textColor="@color/axisight_white" />
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/delta_uncalibrated"
+                    android:textColor="@color/axisight_marker"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
-                <SeekBar
-                    android:id="@+id/seekMinArea"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="4dp"
-                    android:max="20000"
-                    android:progress="200" />
+                    android:layout_marginBottom="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/label_max_area"
-                    android:textColor="@color/axisight_white" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:text="@string/label_target_radius"
+                        android:textColor="@color/axisight_white" />
 
-                <SeekBar
-                    android:id="@+id/seekMaxArea"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="4dp"
-                    android:max="200000"
-                    android:progress="50000" />
+                    <EditText
+                        android:id="@+id/edTargetRadius"
+                        android:layout_width="90dp"
+                        android:layout_height="40dp"
+                        android:background="@android:drawable/edit_text"
+                        android:hint="@string/hint_target_radius"
+                        android:importantForAutofill="no"
+                        android:inputType="numberDecimal"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/axisight_marker"
+                        android:textColorHint="@color/axisight_orbit" />
+                </LinearLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -357,6 +367,96 @@
                         android:paddingEnd="10dp"
                         android:textColor="@color/axisight_marker"
                         android:textColorHint="@color/axisight_orbit" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/calibrationPanel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/axisight_scrim"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:layout_constraintBottom_toTopOf="@id/tuningPanel"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/topControls"
+            app:strokeColor="@color/axisight_accent"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="@string/calibration_panel_title"
+                    android:textColor="@color/axisight_white"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/txtCalStep"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="@string/calibration_step_center"
+                    android:textColor="@color/axisight_white"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/txtCalCapture"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="@string/calibration_step_wait_tap"
+                    android:textColor="@color/axisight_marker"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/txtCalQuality"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/calibration_quality_pending"
+                    android:textColor="@color/axisight_white"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnCalConfirm"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/calibration_confirm" />
+
+                    <Button
+                        android:id="@+id/btnCalRetry"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:text="@string/calibration_retry" />
+
+                    <Button
+                        android:id="@+id/btnCalCancel"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:text="@string/calibration_cancel" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

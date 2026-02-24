@@ -24,6 +24,18 @@ enum class FailureReason {
 object BlobDetector {
     private const val TAG = "BlobDetector"
 
+    private fun isInsideTarget(i: Int, j: Int, ds: Int, cfg: DetectorConfig): Boolean {
+        val cx = cfg.targetCenterX ?: return true
+        val cy = cfg.targetCenterY ?: return true
+        val radiusPx = cfg.targetRadiusPx
+        if (radiusPx <= 0f) return true
+        val x = i * ds
+        val y = j * ds
+        val dx = x - cx
+        val dy = y - cy
+        return (dx * dx + dy * dy) <= radiusPx * radiusPx
+    }
+
     /**
      * Calculates luminance from RGB pixel (ARGB format).
      * Uses standard luminance formula: 0.299*R + 0.587*G + 0.114*B
@@ -57,6 +69,7 @@ object BlobDetector {
         for (j in 0 until dh) {
             val sy = j * ds
             for (i in 0 until dw) {
+                if (!isInsideTarget(i, j, ds, cfg)) continue
                 val sx = i * ds
                 val idx = sy * rs + sx * ps
                 // Y plane is practically luminance [0-255]
@@ -101,6 +114,7 @@ object BlobDetector {
         for (j in 0 until dh) {
             val sy0 = j * ds
             for (i in 0 until dw) {
+                if (!isInsideTarget(i, j, ds, cfg)) continue
                 val sx0 = i * ds
                 val idx = sy0 * rs + sx0 * ps
                 val v = bb.get(idx).toInt() and 0xFF
@@ -143,6 +157,7 @@ object BlobDetector {
              for (j in 0 until dh) {
                 val sy0 = j * ds
                 for (i in 0 until dw) {
+                    if (!isInsideTarget(i, j, ds, cfg)) continue
                     val sx0 = i * ds
                     val idx = sy0 * rs + sx0 * ps
                     val v = bb.get(idx).toInt() and 0xFF
@@ -197,6 +212,7 @@ object BlobDetector {
         
         for (j in 0 until dh) {
             for (i in 0 until dw) {
+                if (!isInsideTarget(i, j, ds, cfg)) continue
                 val pixel = pixels[j * ds * w + i * ds]
                 val v = pixelToLuminance(pixel)
                 histogram[v]++
@@ -237,6 +253,7 @@ object BlobDetector {
 
         for (j in 0 until dh) {
             for (i in 0 until dw) {
+                if (!isInsideTarget(i, j, ds, cfg)) continue
                 val pixel = pixels[j * ds * w + i * ds]
                 val v = pixelToLuminance(pixel)
                 if (v <= thr) {
@@ -275,6 +292,7 @@ object BlobDetector {
              // Fallback
              for (j in 0 until dh) {
                 for (i in 0 until dw) {
+                    if (!isInsideTarget(i, j, ds, cfg)) continue
                     val pixel = pixels[j * ds * w + i * ds]
                     val v = pixelToLuminance(pixel)
                     if (v <= thr) {

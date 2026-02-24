@@ -3,7 +3,7 @@
     <string name="controls_title">Camera and Capture Controls</string>
     <string name="sim">Simulate</string>
     <string name="auto">Auto-Detect</string>
-    <string name="calibrate">Calibrate</string>
+    <string name="calibrate">Cal Wizard</string>
     <string name="export_csv">Export CSV</string>
     <string name="lock">Lock</string>
     <string name="unlock">Unlock</string>
@@ -17,13 +17,33 @@
     <string name="connect">Connect</string>
     <string name="label_min_area">Minimum Area</string>
     <string name="label_max_area">Maximum Area</string>
+    <string name="label_target_radius">Target Radius (px)</string>
+    <string name="hint_target_radius">e.g. 120</string>
     <string name="label_circularity">Minimum Circularity</string>
     <string name="label_kstd">Noise Rejection (kStd)</string>
-    <string name="label_mm_per_px">mm/px</string>
-    <string name="label_known_mm">Known mm</string>
-    <string name="hint_mm_per_px">e.g. 0.02</string>
-    <string name="default_known_mm">10</string>
+    <string name="label_mm_per_px">in/px</string>
+    <string name="label_known_mm">Known in</string>
+    <string name="hint_mm_per_px">e.g. 0.0010</string>
+    <string name="default_known_mm">1.000</string>
     <string name="unset_value">unset</string>
-    <string name="params_summary">minA %1$d  maxA %2$d  circ&gt;=%3$s  kStd %4$s  mm/px %5$s</string>
-    <string name="params_summary_initial">minA 200  maxA 50000  circ&gt;=0.50  kStd 0.50  mm/px unset</string>
+    <string name="params_summary">target r=%1$spx  circ&gt;=%2$s  kStd %3$s  in/px %4$s</string>
+    <string name="params_summary_initial">target r=0px  circ&gt;=0.50  kStd 0.50  in/px unset</string>
+    <string name="delta_uncalibrated">Delta: calibrate to get inch offsets</string>
+    <string name="delta_waiting_tool">Delta: waiting for tool detection</string>
+    <string name="delta_value">Delta: dX=%1$.4f in  dY=%2$.4f in</string>
+    <string name="calibration_step_center">Calibration step 1/3: tap true center.</string>
+    <string name="calibration_step_up">Calibration step 2/3: tap point in +Y (up) direction.</string>
+    <string name="calibration_step_scale_1">Calibration step 3/3: tap first scale point.</string>
+    <string name="calibration_step_scale_2">Calibration step 3/3: tap second scale point (known distance).</string>
+    <string name="calibration_complete">Calibration saved.</string>
+    <string name="calibration_failed">Calibration failed. Retry wizard.</string>
+    <string name="calibration_panel_title">Calibration Wizard</string>
+    <string name="calibration_step_wait_tap">Tap a point for this step, then confirm.</string>
+    <string name="calibration_point_captured">Captured: x=%1$.1f y=%2$.1f</string>
+    <string name="calibration_quality_pending">Quality: pending final step</string>
+    <string name="calibration_quality_value">Quality: up=%1$.0fpx scale=%2$.0fpx estErr=%3$.4f in</string>
+    <string name="calibration_quality_fail">Quality too low. Use longer spans for up/scale and retry.</string>
+    <string name="calibration_confirm">Confirm</string>
+    <string name="calibration_retry">Retry</string>
+    <string name="calibration_cancel">Cancel</string>
 </resources>

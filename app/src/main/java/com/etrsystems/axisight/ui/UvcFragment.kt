@@ -50,6 +50,9 @@ class UvcFragment : CameraFragment() {
     private var isProcessing = false
     private var frameBitmap: Bitmap? = null
     private val detectorConfig = DetectorConfig()
+    private var targetGlobalX: Float? = null
+    private var targetGlobalY: Float? = null
+    private var targetRadiusPx: Float = detectorConfig.targetRadiusPx
 
     fun setDetectionCallback(cb: DetectionCallback) {
         this.callback = cb
@@ -57,6 +60,13 @@ class UvcFragment : CameraFragment() {
 
     fun setCameraStateListener(listener: CameraStateListener?) {
         cameraStateListener = listener
+    }
+
+    fun setTargetCircle(x: Float, y: Float, radiusPx: Float) {
+        targetGlobalX = x
+        targetGlobalY = y
+        targetRadiusPx = radiusPx
+        applyTargetCircleToDetector()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -122,6 +132,7 @@ class UvcFragment : CameraFragment() {
             val view = inflater.inflate(R.layout.fragment_uvc, container, false)
             textureView = view.findViewById(R.id.uvc_texture_view)
             textureView?.setAspectRatio(previewWidth, previewHeight)
+            applyTargetCircleToDetector()
             Log.d(TAG, "Root view inflated (${previewWidth}x${previewHeight})")
             view
         } catch (e: Exception) {
@@ -298,6 +309,7 @@ class UvcFragment : CameraFragment() {
 
     private fun processBitmap(bmp: Bitmap) {
         try {
+            applyTargetCircleToDetector()
             val result = BlobDetector.detectDarkDotCenter(bmp, detectorConfig)
             when (result) {
                 is DetectionResult.Success -> {
@@ -316,6 +328,16 @@ class UvcFragment : CameraFragment() {
         } catch (e: Exception) {
             Log.e(TAG, "Detection error", e)
         }
+    }
+
+    private fun applyTargetCircleToDetector() {
+        val x = targetGlobalX ?: return
+        val y = targetGlobalY ?: return
+        val viewX = textureView?.x ?: 0f
+        val viewY = textureView?.y ?: 0f
+        detectorConfig.targetCenterX = x - viewX
+        detectorConfig.targetCenterY = y - viewY
+        detectorConfig.targetRadiusPx = targetRadiusPx
     }
 
     private fun isUvcDevice(device: UsbDevice): Boolean {

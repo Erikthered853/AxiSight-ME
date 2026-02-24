@@ -18,5 +18,8 @@ data class DetectorConfig(
     var minCircularity: Double = 0.5,
     var kStd: Double = 0.5,
     var downscale: Int = 4,
-    var lockedThreshold: Int? = null
+    var lockedThreshold: Int? = null,
+    var targetCenterX: Float? = null,
+    var targetCenterY: Float? = null,
+    var targetRadiusPx: Float = 160f
 )

@@ -53,16 +53,30 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private var simulate = false
     private var autoDetect = true
-    private var mmPerPx: Double? = null
-    private var knownMm: Double = 10.0
+    private var inPerPx: Double? = null
+    private var knownInches: Double = 1.0
 
     private val cfg = DetectorConfig()
 
-    private var calMode = false
-    private var calP1: Pair<Float, Float>? = null
+    private enum class CalibrationStep { NONE, CENTER, UP, SCALE_P1, SCALE_P2 }
+    private var calibrationStep = CalibrationStep.NONE
+    private var calCenter: Pair<Float, Float>? = null
+    private var calUpPoint: Pair<Float, Float>? = null
+    private var calScaleP1: Pair<Float, Float>? = null
+    private var calScaleP2: Pair<Float, Float>? = null
+    private var pendingCalTap: Pair<Float, Float>? = null
+    private var calibrationData: CalibrationData? = null
+    private var latestToolPoint: Pair<Float, Float>? = null
 
     private var simAngle = 0.0
     private var simRadiusPx = 200f
+
+    private var isResizingTarget = false
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+    private var targetTapSlopPx = 0f
+    private var targetEdgeTolerancePx = 0f
+    private var updatingTargetRadiusField = false
 
 
     
@@ -72,6 +86,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var trackingEnabled = true
 
     private var csvLogger: CsvLogger? = null
+    private lateinit var calibrationStore: CalibrationStore
 
     private val camPerm = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -161,10 +176,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         super.onCreate(savedInstanceState)
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
+        val density = resources.displayMetrics.density
+        targetTapSlopPx = 18f * density
+        targetEdgeTolerancePx = 24f * density
         registerUsbMonitorRecoveryReceiverIfNeeded()
         registerUsbAttachReceiverIfNeeded()
 
         csvLogger = CsvLogger(this)
+        calibrationStore = CalibrationStore(this)
+        calibrationData = calibrationStore.load()
 
         b.rgCameraSource.setOnCheckedChangeListener { _, checkedId ->
             when (checkedId) {
@@ -227,8 +247,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
         b.switchAuto.setOnCheckedChangeListener { _, checked -> autoDetect = checked }
 
-        b.btnCal.setOnClickListener { calMode = true; calP1 = null }
-        b.btnExport.setOnClickListener { csvLogger?.exportOverlay(b.overlay, mmPerPx) }
+        b.btnCal.setOnClickListener { startCalibrationWizard() }
+        b.btnCalConfirm.setOnClickListener { confirmCalibrationStep() }
+        b.btnCalRetry.setOnClickListener { retryCalibrationStep() }
+        b.btnCalCancel.setOnClickListener { cancelCalibrationWizard() }
+        b.btnExport.setOnClickListener { csvLogger?.exportOverlay(b.overlay, inPerPx?.times(25.4)) }
         
         b.btnLock.setOnClickListener {
             isLocked = !isLocked
@@ -271,34 +294,66 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         updateTrackingButtons()
 
-        fun updateParamsText() {
-            val mmText = mmPerPx?.let { String.format(Locale.US, "%.4f", it) } ?: getString(R.string.unset_value)
-            val circText = String.format(Locale.US, "%.2f", cfg.minCircularity)
-            val kStdText = String.format(Locale.US, "%.2f", cfg.kStd)
-            b.txtParams.text = getString(
-                R.string.params_summary,
-                cfg.minAreaPx,
-                cfg.maxAreaPx,
-                circText,
-                kStdText,
-                mmText
-            )
+        b.seekCirc.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.minCircularity = (p/100.0).coerceIn(0.0,1.0); updateParamsSummary() })
+        b.seekKstd.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.kStd = p/100.0; updateParamsSummary() })
+        b.overlay.onTargetChanged = { tx, ty, radius ->
+            cfg.targetCenterX = tx
+            cfg.targetCenterY = ty
+            cfg.targetRadiusPx = radius
+            if (!b.edTargetRadius.hasFocus()) {
+                updatingTargetRadiusField = true
+                b.edTargetRadius.setText(String.format(Locale.US, "%.1f", radius))
+                updatingTargetRadiusField = false
+            }
+            updateParamsSummary()
+            val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
+            frag?.setTargetCircle(tx, ty, radius)
         }
-        b.seekMinArea.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.minAreaPx = max(1, p); updateParamsText() })
-        b.seekMaxArea.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.maxAreaPx = max(cfg.minAreaPx+1, p); updateParamsText() })
-        b.seekCirc.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.minCircularity = (p/100.0).coerceIn(0.0,1.0); updateParamsText() })
-        b.seekKstd.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.kStd = p/100.0; updateParamsText() })
-        updateParamsText()
+        b.edTargetRadius.setText(String.format(Locale.US, "%.1f", cfg.targetRadiusPx))
+        b.edTargetRadius.setOnEditorActionListener { v, _, _ ->
+            if (!updatingTargetRadiusField) {
+                val enteredRadius = v.text?.toString()?.trim()?.toFloatOrNull()
+                if (enteredRadius != null) {
+                    b.overlay.setTargetRadius(enteredRadius)
+                }
+            }
+            true
+        }
+        b.edTargetRadius.setOnFocusChangeListener { v, hasFocus ->
+            if (!hasFocus && !updatingTargetRadiusField) {
+                val enteredRadius = (v as? android.widget.EditText)?.text?.toString()?.trim()?.toFloatOrNull()
+                if (enteredRadius != null) {
+                    b.overlay.setTargetRadius(enteredRadius)
+                }
+            }
+        }
+        b.overlay.post {
+            val w = b.overlay.width.toFloat()
+            val h = b.overlay.height.toFloat()
+            if (w > 0f && h > 0f) {
+                b.overlay.setTargetCenter(w * 0.5f, h * 0.5f)
+                b.overlay.setTargetRadius(min(w, h) * 0.2f)
+            }
+        }
+        applyLoadedCalibration()
+        updateParamsSummary()
+        updateDeltaReadout()
+        updateCalibrationPanel()
 
         b.edMmPerPx.setOnEditorActionListener { v, _, _ ->
-            mmPerPx = v.text?.toString()?.trim()?.toDoubleOrNull()
-            b.overlay.mmPerPx = mmPerPx
-            updateParamsText()
+            inPerPx = v.text?.toString()?.trim()?.toDoubleOrNull()
+            b.overlay.mmPerPx = inPerPx?.times(25.4)
+            updateParamsSummary()
+            if (inPerPx != null && calibrationData != null) {
+                calibrationData = calibrationData?.copy(inchesPerPixel = inPerPx!!)
+                calibrationData?.let { calibrationStore.save(it) }
+            }
+            updateDeltaReadout()
             true
         }
         b.edKnownMm.setText(getString(R.string.default_known_mm))
         b.edKnownMm.setOnEditorActionListener { v, _, _ ->
-            knownMm = v.text?.toString()?.toDoubleOrNull() ?: 10.0
+            knownInches = v.text?.toString()?.toDoubleOrNull() ?: 1.0
             true
         }
 
@@ -307,27 +362,32 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 MotionEvent.ACTION_DOWN -> {
                     val x = ev.x
                     val y = ev.y
-                    if (calMode) {
-                        if (calP1 == null) calP1 = x to y
-                        else {
-                            val p1 = calP1!!
-                            val dp = hypot((x - p1.first).toDouble(), (y - p1.second).toDouble())
-                            if (dp > 0.0) {
-                                mmPerPx = knownMm / dp
-                                b.overlay.mmPerPx = mmPerPx
-                                updateParamsText()
-                            }
-                            calP1 = null
-                            calMode = false
-                        }
-                    } else if (!autoDetect || simulate) {
-                        if (trackingEnabled) {
-                            b.overlay.addPoint(x, y)
+                    if (!handleCalibrationTap(x, y)) {
+                        touchDownX = x
+                        touchDownY = y
+                        isResizingTarget = isNearTargetEdge(x, y)
+                        if (isResizingTarget) {
+                            val radius = hypot((x - b.overlay.targetX).toDouble(), (y - b.overlay.targetY).toDouble()).toFloat()
+                            b.overlay.setTargetRadius(radius)
                         }
                     }
                     true
                 }
+                MotionEvent.ACTION_MOVE -> {
+                    if (calibrationStep == CalibrationStep.NONE && isResizingTarget) {
+                        val radius = hypot((ev.x - b.overlay.targetX).toDouble(), (ev.y - b.overlay.targetY).toDouble()).toFloat()
+                        b.overlay.setTargetRadius(radius)
+                    }
+                    true
+                }
                 MotionEvent.ACTION_UP -> {
+                    if (calibrationStep == CalibrationStep.NONE && !isResizingTarget) {
+                        val moveDistance = hypot((ev.x - touchDownX).toDouble(), (ev.y - touchDownY).toDouble()).toFloat()
+                        if (moveDistance <= targetTapSlopPx) {
+                            b.overlay.setTargetCenter(ev.x, ev.y)
+                        }
+                    }
+                    isResizingTarget = false
                     view.performClick()
                     true
                 }
@@ -336,6 +396,280 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         if (!simulate) ensureCameraPermission { startCamera() }
+    }
+
+    private fun startCalibrationWizard() {
+        calibrationStep = CalibrationStep.CENTER
+        calCenter = null
+        calUpPoint = null
+        calScaleP1 = null
+        calScaleP2 = null
+        pendingCalTap = null
+        updateCalibrationPanel()
+    }
+
+    private fun handleCalibrationTap(x: Float, y: Float): Boolean {
+        if (calibrationStep == CalibrationStep.NONE) return false
+        pendingCalTap = x to y
+        updateCalibrationPanel()
+        return true
+    }
+
+    private fun confirmCalibrationStep() {
+        if (calibrationStep == CalibrationStep.NONE) return
+        val tap = pendingCalTap ?: return
+        pendingCalTap = null
+
+        when (calibrationStep) {
+            CalibrationStep.NONE -> Unit
+            CalibrationStep.CENTER -> {
+                calCenter = tap
+                calibrationStep = CalibrationStep.UP
+            }
+            CalibrationStep.UP -> {
+                val center = calCenter
+                if (center == null) {
+                    calibrationStep = CalibrationStep.CENTER
+                    Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
+                    updateCalibrationPanel()
+                    return
+                }
+                val upDist = hypot((tap.first - center.first).toDouble(), (tap.second - center.second).toDouble())
+                if (upDist < MIN_UP_DISTANCE_PX) {
+                    pendingCalTap = tap
+                    Toast.makeText(this, getString(R.string.calibration_quality_fail), Toast.LENGTH_SHORT).show()
+                    updateCalibrationPanel()
+                    return
+                }
+                calUpPoint = tap
+                calibrationStep = CalibrationStep.SCALE_P1
+            }
+            CalibrationStep.SCALE_P1 -> {
+                calScaleP1 = tap
+                calibrationStep = CalibrationStep.SCALE_P2
+            }
+            CalibrationStep.SCALE_P2 -> {
+                calScaleP2 = tap
+                tryFinalizeCalibration()
+            }
+        }
+        updateCalibrationPanel()
+    }
+
+    private fun retryCalibrationStep() {
+        if (calibrationStep == CalibrationStep.NONE) return
+        pendingCalTap = null
+        when (calibrationStep) {
+            CalibrationStep.CENTER -> calCenter = null
+            CalibrationStep.UP -> calUpPoint = null
+            CalibrationStep.SCALE_P1 -> calScaleP1 = null
+            CalibrationStep.SCALE_P2 -> calScaleP2 = null
+            CalibrationStep.NONE -> Unit
+        }
+        updateCalibrationPanel()
+    }
+
+    private fun cancelCalibrationWizard() {
+        calibrationStep = CalibrationStep.NONE
+        pendingCalTap = null
+        calCenter = null
+        calUpPoint = null
+        calScaleP1 = null
+        calScaleP2 = null
+        updateCalibrationPanel()
+    }
+
+    private fun tryFinalizeCalibration() {
+        val center = calCenter
+        val upPoint = calUpPoint
+        val scaleP1 = calScaleP1
+        val scaleP2 = calScaleP2
+        if (center == null || upPoint == null || scaleP1 == null || scaleP2 == null) {
+            Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val typedKnownInches = b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull()
+        if (typedKnownInches != null && typedKnownInches > 0.0) {
+            knownInches = typedKnownInches
+        }
+        if (knownInches <= 0.0) {
+            Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val quality = evaluateCalibrationQuality(center, upPoint, scaleP1, scaleP2, knownInches)
+        if (!quality.acceptable) {
+            b.txtCalQuality.text = getString(R.string.calibration_quality_fail)
+            Toast.makeText(this, getString(R.string.calibration_quality_fail), Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val data = CalibrationData.fromCenterUpAndScale(
+            centerX = center.first,
+            centerY = center.second,
+            upPointX = upPoint.first,
+            upPointY = upPoint.second,
+            inchesPerPixel = quality.inchesPerPixel
+        )
+        if (data == null) {
+            Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        calibrationData = data
+        inPerPx = data.inchesPerPixel
+        b.overlay.mmPerPx = inPerPx?.times(25.4)
+        b.edMmPerPx.setText(String.format(Locale.US, "%.6f", data.inchesPerPixel))
+        calibrationStore.save(data)
+        b.overlay.setTargetCenter(data.centerX, data.centerY)
+        calibrationStep = CalibrationStep.NONE
+        pendingCalTap = null
+        updateCalibrationPanel()
+        updateParamsSummary()
+        updateDeltaReadout()
+        Toast.makeText(this, getString(R.string.calibration_complete), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun evaluateCalibrationQuality(
+        center: Pair<Float, Float>,
+        upPoint: Pair<Float, Float>,
+        scaleP1: Pair<Float, Float>,
+        scaleP2: Pair<Float, Float>,
+        knownInches: Double
+    ): CalibrationQuality {
+        val upDistancePx = hypot((upPoint.first - center.first).toDouble(), (upPoint.second - center.second).toDouble())
+        val scaleDistancePx = hypot((scaleP2.first - scaleP1.first).toDouble(), (scaleP2.second - scaleP1.second).toDouble())
+        val safeScalePx = scaleDistancePx.coerceAtLeast(1.0)
+        val inchesPerPixel = knownInches / safeScalePx
+
+        // Endpoint quantization estimate assuming +/-1px around each tap.
+        val scaleErrorIn = knownInches * (sqrt(2.0) / safeScalePx)
+        // Angular uncertainty estimate from 1px tap uncertainty on up vector.
+        val angularErrorRad = atan2(1.0, upDistancePx.coerceAtLeast(1.0))
+        val axisErrorAtOneIn = tan(angularErrorRad)
+        val combinedErrorIn = hypot(scaleErrorIn, axisErrorAtOneIn)
+
+        val acceptable = upDistancePx >= MIN_UP_DISTANCE_PX &&
+            scaleDistancePx >= MIN_SCALE_DISTANCE_PX &&
+            combinedErrorIn <= MAX_COMBINED_ERROR_IN
+
+        return CalibrationQuality(
+            upDistancePx = upDistancePx,
+            scaleDistancePx = scaleDistancePx,
+            inchesPerPixel = inchesPerPixel,
+            combinedErrorIn = combinedErrorIn,
+            acceptable = acceptable
+        )
+    }
+
+    private fun updateCalibrationPanel() {
+        val active = calibrationStep != CalibrationStep.NONE
+        b.calibrationPanel.visibility = if (active) View.VISIBLE else View.GONE
+        if (!active) {
+            b.overlay.setCalibrationMarkers(
+                center = null,
+                up = null,
+                scaleP1 = null,
+                scaleP2 = null,
+                pending = null
+            )
+            return
+        }
+
+        val stepText = when (calibrationStep) {
+            CalibrationStep.NONE -> ""
+            CalibrationStep.CENTER -> getString(R.string.calibration_step_center)
+            CalibrationStep.UP -> getString(R.string.calibration_step_up)
+            CalibrationStep.SCALE_P1 -> getString(R.string.calibration_step_scale_1)
+            CalibrationStep.SCALE_P2 -> getString(R.string.calibration_step_scale_2)
+        }
+        b.txtCalStep.text = stepText
+
+        b.txtCalCapture.text = pendingCalTap?.let { (x, y) ->
+            getString(R.string.calibration_point_captured, x, y)
+        } ?: getString(R.string.calibration_step_wait_tap)
+
+        val qualityText = if (calibrationStep == CalibrationStep.SCALE_P2 && calCenter != null && calUpPoint != null && calScaleP1 != null && pendingCalTap != null) {
+            val typedKnownInches = b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull()
+            val useKnown = if (typedKnownInches != null && typedKnownInches > 0.0) typedKnownInches else knownInches
+            val q = evaluateCalibrationQuality(
+                center = calCenter!!,
+                upPoint = calUpPoint!!,
+                scaleP1 = calScaleP1!!,
+                scaleP2 = pendingCalTap!!,
+                knownInches = useKnown
+            )
+            getString(
+                R.string.calibration_quality_value,
+                q.upDistancePx,
+                q.scaleDistancePx,
+                q.combinedErrorIn
+            )
+        } else {
+            getString(R.string.calibration_quality_pending)
+        }
+        b.txtCalQuality.text = qualityText
+        b.btnCalConfirm.isEnabled = pendingCalTap != null
+        b.overlay.setCalibrationMarkers(
+            center = calCenter,
+            up = calUpPoint,
+            scaleP1 = calScaleP1,
+            scaleP2 = calScaleP2,
+            pending = pendingCalTap
+        )
+    }
+
+    private data class CalibrationQuality(
+        val upDistancePx: Double,
+        val scaleDistancePx: Double,
+        val inchesPerPixel: Double,
+        val combinedErrorIn: Double,
+        val acceptable: Boolean
+    )
+
+    private fun applyLoadedCalibration() {
+        val data = calibrationData ?: return
+        inPerPx = data.inchesPerPixel
+        b.overlay.mmPerPx = inPerPx?.times(25.4)
+        b.edMmPerPx.setText(String.format(Locale.US, "%.6f", data.inchesPerPixel))
+        b.overlay.post {
+            b.overlay.setTargetCenter(data.centerX, data.centerY)
+        }
+        updateParamsSummary()
+    }
+
+    private fun onToolPointDetected(x: Float, y: Float) {
+        b.overlay.addPoint(x, y)
+        latestToolPoint = x to y
+        updateDeltaReadout()
+    }
+
+    private fun updateParamsSummary() {
+        val inText = inPerPx?.let { String.format(Locale.US, "%.6f", it) } ?: getString(R.string.unset_value)
+        val radiusText = String.format(Locale.US, "%.1f", cfg.targetRadiusPx)
+        val circText = String.format(Locale.US, "%.2f", cfg.minCircularity)
+        val kStdText = String.format(Locale.US, "%.2f", cfg.kStd)
+        b.txtParams.text = getString(
+            R.string.params_summary,
+            radiusText,
+            circText,
+            kStdText,
+            inText
+        )
+    }
+
+    private fun updateDeltaReadout() {
+        val data = calibrationData
+        val point = latestToolPoint
+        b.txtDelta.text = when {
+            data == null -> getString(R.string.delta_uncalibrated)
+            point == null -> getString(R.string.delta_waiting_tool)
+            else -> {
+                val (dx, dy) = data.toolOffsetInches(point.first, point.second)
+                getString(R.string.delta_value, dx, dy)
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -421,7 +755,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                                 
                                 val result = BlobDetector.detectDarkDotCenter(image, cfg)
                                 if (result is DetectionResult.Success && trackingEnabled) {
-                                    b.overlay.addPoint(result.x, result.y)
+                                    onToolPointDetected(result.x, result.y)
                                 }
                             }
                         } catch (e: Exception) {
@@ -562,10 +896,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             productId = device.productId,
             deviceName = device.deviceName
         )
+        uvcFragment.setTargetCircle(
+            x = b.overlay.targetX,
+            y = b.overlay.targetY,
+            radiusPx = b.overlay.targetRadiusPx
+        )
         uvcFragment.setDetectionCallback(object : com.etrsystems.axisight.ui.UvcFragment.DetectionCallback {
             override fun onPointDetected(x: Float, y: Float) {
                 if (autoDetect && !simulate && trackingEnabled) {
-                    b.overlay.addPoint(x, y)
+                    onToolPointDetected(x, y)
                 }
             }
         })
@@ -713,7 +1052,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             val x = cx + simRadiusPx * cos(simAngle).toFloat()
             val y = cy + simRadiusPx * sin(simAngle).toFloat()
             b.overlay.setSimDot(x, y)
-            if (autoDetect && trackingEnabled) b.overlay.addPoint(x, y)
+            if (autoDetect && trackingEnabled) onToolPointDetected(x, y)
             b.previewView.postDelayed(this, 16L)
         }
     }
@@ -735,7 +1074,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 val bmp = b.textureView.bitmap ?: return
                 val result = BlobDetector.detectDarkDotCenter(bmp, cfg)
                 if (result is DetectionResult.Success && trackingEnabled) {
-                    b.overlay.addPoint(result.x, result.y)
+                    onToolPointDetected(result.x, result.y)
                 }
             }
         } catch (e: Exception) {
@@ -748,10 +1087,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         b.btnTrackStop.isEnabled = trackingEnabled
     }
 
+    private fun isNearTargetEdge(x: Float, y: Float): Boolean {
+        val distance = hypot((x - b.overlay.targetX).toDouble(), (y - b.overlay.targetY).toDouble()).toFloat()
+        return abs(distance - b.overlay.targetRadiusPx) <= targetEdgeTolerancePx
+    }
+
     companion object {
         private const val TAG = "MainActivity"
         private const val USB_RECONNECT_DELAY_MS = 600L
         private const val USB_PERMISSION_RETRY_COOLDOWN_MS = 1500L
+        private const val MIN_UP_DISTANCE_PX = 40.0
+        private const val MIN_SCALE_DISTANCE_PX = 80.0
+        private const val MAX_COMBINED_ERROR_IN = 0.020
     }
 }
 
