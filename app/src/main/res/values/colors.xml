@@ -7,5 +7,6 @@
     <color name="axisight_surface">#F7FBFD</color>
     <color name="axisight_accent">#D7752F</color>
     <color name="axisight_text">#132B38</color>
-    <color name="axisight_scrim">#9A0D1F2A</color>
+    <color name="axisight_scrim">#CC0D1F2A</color>
+    <color name="axisight_bar_bg">#E6102640</color>
 </resources>

@@ -4,7 +4,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/axisight_bg">
+    android:background="@color/axisight_marker">
 
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
@@ -42,227 +42,217 @@
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="12dp">
+        android:layout_height="match_parent">
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/topControls"
+        <!-- ═══════════════════════════════════════════
+             TOP STRIP — camera source + sim toggle + settings
+             ═══════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/topStrip"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/axisight_scrim"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
+            android:background="@color/axisight_bar_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="6dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <RadioGroup
+                android:id="@+id/rgCameraSource"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/rbInternal"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checked="true"
+                    android:text="@string/internal"
+                    android:textColor="@color/axisight_white"
+                    android:textSize="12sp" />
+
+                <RadioButton
+                    android:id="@+id/rbUsb"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/usb"
+                    android:textColor="@color/axisight_white"
+                    android:textSize="12sp" />
+
+                <RadioButton
+                    android:id="@+id/rbWifi"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/wifi"
+                    android:textColor="@color/axisight_white"
+                    android:textSize="12sp" />
+            </RadioGroup>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchSim"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="2dp"
+                android:text="@string/sim"
+                android:textColor="@color/axisight_white"
+                android:textSize="11sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSettings"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="@string/btn_settings_desc"
+                app:icon="@drawable/ic_tune"
+                app:iconTint="@color/axisight_orbit" />
+        </LinearLayout>
+
+        <!-- ═══════════════════════════════════════════
+             WIFI ROW — shown only when WiFi source selected
+             ═══════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/wifiGroup"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:background="@color/axisight_bar_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/topStrip">
+
+            <EditText
+                android:id="@+id/edWifiUrl"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:background="@android:drawable/edit_text"
+                android:hint="@string/wifi_url_hint"
+                android:importantForAutofill="no"
+                android:inputType="textUri"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:textColor="@color/axisight_marker"
+                android:textColorHint="@color/axisight_orbit"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnWifiConnect"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:text="@string/connect"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- ═══════════════════════════════════════════
+             DELTA CARD — floating on camera, primary readout
+             ═══════════════════════════════════════════ -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/deltaCard"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            app:cardBackgroundColor="@color/axisight_scrim"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:layout_constraintBottom_toTopOf="@id/bottomBar"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/topStrip"
+            app:layout_constraintVertical_bias="0.9"
             app:strokeColor="@color/axisight_orbit"
             app:strokeWidth="1dp">
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="12dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
-                    android:text="@string/controls_title"
-                    android:textColor="@color/axisight_white"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <RadioGroup
-                    android:id="@+id/rgCameraSource"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:orientation="horizontal">
-
-                    <RadioButton
-                        android:id="@+id/rbInternal"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:checked="true"
-                        android:text="@string/internal"
-                        android:textColor="@color/axisight_white" />
-
-                    <RadioButton
-                        android:id="@+id/rbUsb"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/usb"
-                        android:textColor="@color/axisight_white" />
-
-                    <RadioButton
-                        android:id="@+id/rbWifi"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/wifi"
-                        android:textColor="@color/axisight_white" />
-                </RadioGroup>
-
-                <LinearLayout
-                    android:id="@+id/wifiGroup"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
-
-                    <EditText
-                        android:id="@+id/edWifiUrl"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:background="@android:drawable/edit_text"
-                        android:hint="@string/wifi_url_hint"
-                        android:importantForAutofill="no"
-                        android:inputType="textUri"
-                        android:paddingStart="10dp"
-                        android:paddingEnd="10dp"
-                        android:textColor="@color/axisight_marker"
-                        android:textColorHint="@color/axisight_orbit" />
-
-                    <Button
-                        android:id="@+id/btnWifiConnect"
-                        android:layout_width="wrap_content"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="8dp"
-                        android:text="@string/connect" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchSim"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/sim"
-                        android:textColor="@color/axisight_white" />
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switchAuto"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:checked="true"
-                        android:text="@string/auto"
-                        android:textColor="@color/axisight_white" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btnCal"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="@string/calibrate" />
-
-                    <Button
-                        android:id="@+id/btnExport"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="@string/export_csv" />
-
-                    <Button
-                        android:id="@+id/btnLock"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:backgroundTint="@color/axisight_accent"
-                        android:text="@string/lock" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btnTrackStart"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="@string/track_start" />
-
-                    <Button
-                        android:id="@+id/btnTrackStop"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="@string/track_stop" />
-
-                    <Button
-                        android:id="@+id/btnTrackReset"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:text="@string/track_reset" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/tuningPanel"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:cardBackgroundColor="@color/axisight_scrim"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:strokeColor="@color/axisight_orbit"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-
-                <TextView
-                    android:id="@+id/txtParams"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:text="@string/params_summary_initial"
-                    android:textColor="@color/axisight_white"
-                    android:textSize="13sp" />
+                android:paddingStart="16dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="8dp">
 
                 <TextView
                     android:id="@+id/txtDelta"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
                     android:text="@string/delta_uncalibrated"
-                    android:textColor="@color/axisight_marker"
+                    android:textColor="@color/axisight_white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.02" />
+
+                <TextView
+                    android:id="@+id/txtParams"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/params_summary_initial"
+                    android:textColor="@color/axisight_orbit"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══════════════════════════════════════════
+             TUNING PANEL — hidden until ⚙ tapped
+             ═══════════════════════════════════════════ -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/tuningPanel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/axisight_scrim"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:layout_constraintBottom_toTopOf="@id/bottomBar"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:strokeColor="@color/axisight_orbit"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/tuning_title"
+                    android:textColor="@color/axisight_white"
                     android:textSize="13sp"
                     android:textStyle="bold" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchAuto"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:checked="true"
+                    android:text="@string/auto"
+                    android:textColor="@color/axisight_white" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -281,7 +271,7 @@
                     <EditText
                         android:id="@+id/edTargetRadius"
                         android:layout_width="90dp"
-                        android:layout_height="40dp"
+                        android:layout_height="36dp"
                         android:background="@android:drawable/edit_text"
                         android:hint="@string/hint_target_radius"
                         android:importantForAutofill="no"
@@ -336,7 +326,7 @@
                     <EditText
                         android:id="@+id/edMmPerPx"
                         android:layout_width="0dp"
-                        android:layout_height="40dp"
+                        android:layout_height="36dp"
                         android:layout_marginEnd="8dp"
                         android:layout_weight="1"
                         android:background="@android:drawable/edit_text"
@@ -358,7 +348,7 @@
                     <EditText
                         android:id="@+id/edKnownMm"
                         android:layout_width="72dp"
-                        android:layout_height="40dp"
+                        android:layout_height="36dp"
                         android:background="@android:drawable/edit_text"
                         android:hint="@string/default_known_mm"
                         android:importantForAutofill="no"
@@ -371,20 +361,23 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- ═══════════════════════════════════════════
+             CALIBRATION PANEL — shown during wizard
+             ═══════════════════════════════════════════ -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/calibrationPanel"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="12dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="4dp"
             android:visibility="gone"
             app:cardBackgroundColor="@color/axisight_scrim"
             app:cardCornerRadius="16dp"
             app:cardElevation="2dp"
-            app:layout_constraintBottom_toTopOf="@id/tuningPanel"
+            app:layout_constraintBottom_toTopOf="@id/bottomBar"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/topControls"
             app:strokeColor="@color/axisight_accent"
             app:strokeWidth="1dp">
 
@@ -407,7 +400,7 @@
                     android:id="@+id/txtCalStep"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
+                    android:layout_marginBottom="4dp"
                     android:text="@string/calibration_step_center"
                     android:textColor="@color/axisight_white"
                     android:textSize="13sp" />
@@ -416,9 +409,9 @@
                     android:id="@+id/txtCalCapture"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
+                    android:layout_marginBottom="4dp"
                     android:text="@string/calibration_step_wait_tap"
-                    android:textColor="@color/axisight_marker"
+                    android:textColor="@color/axisight_orbit"
                     android:textSize="13sp" />
 
                 <TextView
@@ -460,5 +453,83 @@
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══════════════════════════════════════════
+             BOTTOM ACTION BAR — always visible
+             ═══════════════════════════════════════════ -->
+        <LinearLayout
+            android:id="@+id/bottomBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:background="@color/axisight_bar_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="4dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="6dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
+
+            <Button
+                android:id="@+id/btnCal"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:text="@string/cal_short"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnTrackStart"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:text="@string/track_start"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnTrackStop"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:backgroundTint="@color/axisight_accent"
+                android:text="@string/track_stop"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnTrackReset"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:text="@string/track_reset"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnLock"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:backgroundTint="@color/axisight_accent"
+                android:text="@string/lock"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnExport"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:text="@string/csv_short"
+                android:textSize="11sp" />
+        </LinearLayout>
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 </FrameLayout>

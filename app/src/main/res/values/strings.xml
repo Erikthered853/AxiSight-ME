@@ -46,4 +46,8 @@
     <string name="calibration_confirm">Confirm</string>
     <string name="calibration_retry">Retry</string>
     <string name="calibration_cancel">Cancel</string>
+    <string name="tuning_title">Detection Parameters</string>
+    <string name="btn_settings_desc">Toggle detection settings</string>
+    <string name="cal_short">Cal</string>
+    <string name="csv_short">CSV</string>
 </resources>

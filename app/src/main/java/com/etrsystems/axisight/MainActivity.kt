@@ -84,6 +84,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var isLocked = false
     private var lockRequest = false
     private var trackingEnabled = true
+    private var tuningPanelVisible = false
 
     private var csvLogger: CsvLogger? = null
     private lateinit var calibrationStore: CalibrationStore
@@ -187,6 +188,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         calibrationData = calibrationStore.load()
 
         b.rgCameraSource.setOnCheckedChangeListener { _, checkedId ->
+            latestToolPoint = null
+            updateDeltaReadout()
             when (checkedId) {
                 R.id.rbInternal -> {
                     cameraSource = CameraSource.INTERNAL
@@ -293,6 +296,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         updateTrackingButtons()
+
+        b.btnSettings.setOnClickListener {
+            tuningPanelVisible = !tuningPanelVisible
+            b.tuningPanel.visibility = if (tuningPanelVisible) View.VISIBLE else View.GONE
+        }
 
         b.seekCirc.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.minCircularity = (p/100.0).coerceIn(0.0,1.0); updateParamsSummary() })
         b.seekKstd.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.kStd = p/100.0; updateParamsSummary() })
@@ -566,6 +574,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun updateCalibrationPanel() {
         val active = calibrationStep != CalibrationStep.NONE
         b.calibrationPanel.visibility = if (active) View.VISIBLE else View.GONE
+        if (active) {
+            tuningPanelVisible = false
+            b.tuningPanel.visibility = View.GONE
+        }
         if (!active) {
             b.overlay.setCalibrationMarkers(
                 center = null,
