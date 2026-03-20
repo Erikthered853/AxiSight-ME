@@ -1,0 +1,1905 @@
+Compiled from "CameraFragment.kt"
+public abstract class com.jiangdg.ausbc.base.CameraFragment extends com.jiangdg.ausbc.base.BaseFragment implements com.jiangdg.ausbc.callback.ICameraStateCallBack {
+  public static final com.jiangdg.ausbc.base.CameraFragment$Companion Companion;
+
+  private com.jiangdg.ausbc.widget.IAspectRatio mCameraView;
+
+  private com.jiangdg.ausbc.MultiCameraClient mCameraClient;
+
+  private final java.util.HashMap<java.lang.Integer, com.jiangdg.ausbc.MultiCameraClient$ICamera> mCameraMap;
+
+  private com.jiangdg.ausbc.utils.SettableFuture<com.jiangdg.ausbc.MultiCameraClient$ICamera> mCurrentCamera;
+
+  private final kotlin.Lazy mRequestPermission$delegate;
+
+  private static final java.lang.String TAG;
+
+  public com.jiangdg.ausbc.base.CameraFragment();
+    Code:
+       0: aload_0
+       1: invokespecial #10                 // Method com/jiangdg/ausbc/base/BaseFragment."<init>":()V
+       4: aload_0
+       5: iconst_0
+       6: istore_1
+       7: new           #12                 // class java/util/HashMap
+      10: dup
+      11: invokespecial #13                 // Method java/util/HashMap."<init>":()V
+      14: putfield      #17                 // Field mCameraMap:Ljava/util/HashMap;
+      17: aload_0
+      18: getstatic     #23                 // Field com/jiangdg/ausbc/base/CameraFragment$mRequestPermission$2.INSTANCE:Lcom/jiangdg/ausbc/base/CameraFragment$mRequestPermission$2;
+      21: checkcast     #25                 // class kotlin/jvm/functions/Function0
+      24: invokestatic  #31                 // Method kotlin/LazyKt.lazy:(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;
+      27: putfield      #35                 // Field mRequestPermission$delegate:Lkotlin/Lazy;
+      30: return
+
+  private final java.util.concurrent.atomic.AtomicBoolean getMRequestPermission();
+    Code:
+       0: aload_0
+       1: getfield      #35                 // Field mRequestPermission$delegate:Lkotlin/Lazy;
+       4: astore_1
+       5: iconst_0
+       6: istore_3
+       7: aload_1
+       8: invokeinterface #45,  1           // InterfaceMethod kotlin/Lazy.getValue:()Ljava/lang/Object;
+      13: checkcast     #47                 // class java/util/concurrent/atomic/AtomicBoolean
+      16: areturn
+
+  protected void initView();
+    Code:
+       0: aload_0
+       1: invokevirtual #52                 // Method getCameraView:()Lcom/jiangdg/ausbc/widget/IAspectRatio;
+       4: astore_2
+       5: aload_2
+       6: instanceof    #54                 // class android/view/TextureView
+       9: ifeq          24
+      12: aload_0
+      13: aload_2
+      14: checkcast     #54                 // class android/view/TextureView
+      17: invokespecial #58                 // Method handleTextureView:(Landroid/view/TextureView;)V
+      20: aload_2
+      21: goto          44
+      24: aload_2
+      25: instanceof    #60                 // class android/view/SurfaceView
+      28: ifeq          43
+      31: aload_0
+      32: aload_2
+      33: checkcast     #60                 // class android/view/SurfaceView
+      36: invokespecial #64                 // Method handleSurfaceView:(Landroid/view/SurfaceView;)V
+      39: aload_2
+      40: goto          44
+      43: aconst_null
+      44: astore_2
+      45: iconst_0
+      46: istore_3
+      47: iconst_0
+      48: istore        4
+      50: aload_2
+      51: astore        5
+      53: iconst_0
+      54: istore        6
+      56: aload_0
+      57: aload         5
+      59: putfield      #68                 // Field mCameraView:Lcom/jiangdg/ausbc/widget/IAspectRatio;
+      62: aload         5
+      64: ifnonnull     72
+      67: aload_0
+      68: invokevirtual #71                 // Method registerMultiCamera:()V
+      71: return
+      72: nop
+      73: aload_2
+      74: astore_1
+      75: aload_1
+      76: ifnonnull     82
+      79: goto          151
+      82: aload_1
+      83: astore_2
+      84: iconst_0
+      85: istore_3
+      86: iconst_0
+      87: istore        4
+      89: aload_2
+      90: astore        5
+      92: iconst_0
+      93: istore        6
+      95: aload_0
+      96: invokevirtual #75                 // Method getCameraViewContainer:()Landroid/view/ViewGroup;
+      99: astore        7
+     101: aload         7
+     103: ifnonnull     109
+     106: goto          149
+     109: aload         7
+     111: astore        8
+     113: iconst_0
+     114: istore        9
+     116: iconst_0
+     117: istore        10
+     119: aload         8
+     121: astore        11
+     123: iconst_0
+     124: istore        12
+     126: aload         11
+     128: invokevirtual #80                 // Method android/view/ViewGroup.removeAllViews:()V
+     131: aload         11
+     133: aload         5
+     135: checkcast     #82                 // class android/view/View
+     138: aload_0
+     139: aload         11
+     141: invokespecial #86                 // Method getViewLayoutParams:(Landroid/view/ViewGroup;)Landroid/view/ViewGroup$LayoutParams;
+     144: invokevirtual #90                 // Method android/view/ViewGroup.addView:(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V
+     147: nop
+     148: nop
+     149: nop
+     150: nop
+     151: return
+
+  protected void clear();
+    Code:
+       0: aload_0
+       1: invokevirtual #106                // Method unRegisterMultiCamera:()V
+       4: return
+
+  protected final void registerMultiCamera();
+    Code:
+       0: aload_0
+       1: new           #108                // class com/jiangdg/ausbc/MultiCameraClient
+       4: dup
+       5: aload_0
+       6: invokevirtual #112                // Method requireContext:()Landroid/content/Context;
+       9: astore_1
+      10: aload_1
+      11: ldc           #114                // String requireContext()
+      13: invokestatic  #120                // Method kotlin/jvm/internal/Intrinsics.checkNotNullExpressionValue:(Ljava/lang/Object;Ljava/lang/String;)V
+      16: aload_1
+      17: new           #122                // class com/jiangdg/ausbc/base/CameraFragment$registerMultiCamera$1
+      20: dup
+      21: aload_0
+      22: invokespecial #125                // Method com/jiangdg/ausbc/base/CameraFragment$registerMultiCamera$1."<init>":(Lcom/jiangdg/ausbc/base/CameraFragment;)V
+      25: checkcast     #127                // class com/jiangdg/ausbc/callback/IDeviceConnectCallBack
+      28: invokespecial #130                // Method com/jiangdg/ausbc/MultiCameraClient."<init>":(Landroid/content/Context;Lcom/jiangdg/ausbc/callback/IDeviceConnectCallBack;)V
+      31: putfield      #134                // Field mCameraClient:Lcom/jiangdg/ausbc/MultiCameraClient;
+      34: aload_0
+      35: getfield      #134                // Field mCameraClient:Lcom/jiangdg/ausbc/MultiCameraClient;
+      38: astore_1
+      39: aload_1
+      40: ifnonnull     46
+      43: goto          50
+      46: aload_1
+      47: invokevirtual #137                // Method com/jiangdg/ausbc/MultiCameraClient.register:()V
+      50: return
+
+  protected final void unRegisterMultiCamera();
+    Code:
+       0: aload_0
+       1: getfield      #17                 // Field mCameraMap:Ljava/util/HashMap;
+       4: invokevirtual #141                // Method java/util/HashMap.values:()Ljava/util/Collection;
+       7: astore_1
+       8: aload_1
+       9: ldc           #143                // String mCameraMap.values
+      11: invokestatic  #120                // Method kotlin/jvm/internal/Intrinsics.checkNotNullExpressionValue:(Ljava/lang/Object;Ljava/lang/String;)V
+      14: aload_1
+      15: checkcast     #145                // class java/lang/Iterable
+      18: astore_1
+      19: iconst_0
+      20: istore_2
+      21: aload_1
+      22: invokeinterface #149,  1          // InterfaceMethod java/lang/Iterable.iterator:()Ljava/util/Iterator;
+      27: astore_3
+      28: aload_3
+      29: invokeinterface #155,  1          // InterfaceMethod java/util/Iterator.hasNext:()Z
+      34: ifeq          64
+      37: aload_3
+      38: invokeinterface #158,  1          // InterfaceMethod java/util/Iterator.next:()Ljava/lang/Object;
+      43: astore        4
+      45: aload         4
+      47: checkcast     #160                // class com/jiangdg/ausbc/MultiCameraClient$ICamera
+      50: astore        5
+      52: iconst_0
+      53: istore        6
+      55: aload         5
+      57: invokevirtual #163                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.closeCamera:()V
+      60: nop
+      61: goto          28
+      64: nop
+      65: aload_0
+      66: getfield      #17                 // Field mCameraMap:Ljava/util/HashMap;
+      69: invokevirtual #165                // Method java/util/HashMap.clear:()V
+      72: aload_0
+      73: getfield      #134                // Field mCameraClient:Lcom/jiangdg/ausbc/MultiCameraClient;
+      76: astore_1
+      77: aload_1
+      78: ifnonnull     84
+      81: goto          88
+      84: aload_1
+      85: invokevirtual #168                // Method com/jiangdg/ausbc/MultiCameraClient.unRegister:()V
+      88: aload_0
+      89: getfield      #134                // Field mCameraClient:Lcom/jiangdg/ausbc/MultiCameraClient;
+      92: astore_1
+      93: aload_1
+      94: ifnonnull     100
+      97: goto          104
+     100: aload_1
+     101: invokevirtual #171                // Method com/jiangdg/ausbc/MultiCameraClient.destroy:()V
+     104: aload_0
+     105: aconst_null
+     106: putfield      #134                // Field mCameraClient:Lcom/jiangdg/ausbc/MultiCameraClient;
+     109: return
+
+  protected final java.util.List<android.hardware.usb.UsbDevice> getDeviceList();
+    Code:
+       0: aload_0
+       1: getfield      #134                // Field mCameraClient:Lcom/jiangdg/ausbc/MultiCameraClient;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          20
+      13: aload_1
+      14: aconst_null
+      15: iconst_1
+      16: aconst_null
+      17: invokestatic  #186                // Method com/jiangdg/ausbc/MultiCameraClient.getDeviceList$default:(Lcom/jiangdg/ausbc/MultiCameraClient;Ljava/util/List;ILjava/lang/Object;)Ljava/util/List;
+      20: areturn
+
+  private final void handleTextureView(android.view.TextureView);
+    Code:
+       0: aload_1
+       1: new           #190                // class com/jiangdg/ausbc/base/CameraFragment$handleTextureView$1
+       4: dup
+       5: aload_0
+       6: invokespecial #191                // Method com/jiangdg/ausbc/base/CameraFragment$handleTextureView$1."<init>":(Lcom/jiangdg/ausbc/base/CameraFragment;)V
+       9: checkcast     #193                // class android/view/TextureView$SurfaceTextureListener
+      12: invokevirtual #197                // Method android/view/TextureView.setSurfaceTextureListener:(Landroid/view/TextureView$SurfaceTextureListener;)V
+      15: return
+
+  private final void handleSurfaceView(android.view.SurfaceView);
+    Code:
+       0: aload_1
+       1: invokevirtual #203                // Method android/view/SurfaceView.getHolder:()Landroid/view/SurfaceHolder;
+       4: new           #205                // class com/jiangdg/ausbc/base/CameraFragment$handleSurfaceView$1
+       7: dup
+       8: aload_0
+       9: invokespecial #206                // Method com/jiangdg/ausbc/base/CameraFragment$handleSurfaceView$1."<init>":(Lcom/jiangdg/ausbc/base/CameraFragment;)V
+      12: checkcast     #208                // class android/view/SurfaceHolder$Callback
+      15: invokeinterface #214,  2          // InterfaceMethod android/view/SurfaceHolder.addCallback:(Landroid/view/SurfaceHolder$Callback;)V
+      20: return
+
+  protected final com.jiangdg.ausbc.MultiCameraClient$ICamera getCurrentCamera();
+    Code:
+       0: nop
+       1: aload_0
+       2: getfield      #224                // Field mCurrentCamera:Lcom/jiangdg/ausbc/utils/SettableFuture;
+       5: astore_1
+       6: aload_1
+       7: ifnonnull     14
+      10: aconst_null
+      11: goto          27
+      14: aload_1
+      15: ldc2_w        #225                // long 2l
+      18: getstatic     #232                // Field java/util/concurrent/TimeUnit.SECONDS:Ljava/util/concurrent/TimeUnit;
+      21: invokevirtual #238                // Method com/jiangdg/ausbc/utils/SettableFuture.get:(JLjava/util/concurrent/TimeUnit;)Ljava/lang/Object;
+      24: checkcast     #160                // class com/jiangdg/ausbc/MultiCameraClient$ICamera
+      27: astore_1
+      28: goto          41
+      31: astore_2
+      32: aload_2
+      33: invokevirtual #241                // Method java/lang/Exception.printStackTrace:()V
+      36: aconst_null
+      37: checkcast     #160                // class com/jiangdg/ausbc/MultiCameraClient$ICamera
+      40: astore_1
+      41: aload_1
+      42: areturn
+    Exception table:
+       from    to  target type
+           0    28    31   Class java/lang/Exception
+
+  protected final void requestPermission(android.hardware.usb.UsbDevice);
+    Code:
+       0: aload_0
+       1: invokespecial #247                // Method getMRequestPermission:()Ljava/util/concurrent/atomic/AtomicBoolean;
+       4: iconst_1
+       5: invokevirtual #251                // Method java/util/concurrent/atomic/AtomicBoolean.set:(Z)V
+       8: aload_0
+       9: getfield      #134                // Field mCameraClient:Lcom/jiangdg/ausbc/MultiCameraClient;
+      12: astore_2
+      13: aload_2
+      14: ifnonnull     20
+      17: goto          26
+      20: aload_2
+      21: aload_1
+      22: invokevirtual #254                // Method com/jiangdg/ausbc/MultiCameraClient.requestPermission:(Landroid/hardware/usb/UsbDevice;)Z
+      25: pop
+      26: return
+
+  protected com.jiangdg.ausbc.MultiCameraClient$ICamera generateCamera(android.content.Context, android.hardware.usb.UsbDevice);
+    Code:
+       0: aload_1
+       1: ldc_w         #261                // String ctx
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_2
+       8: ldc_w         #265                // String device
+      11: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+      14: new           #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      17: dup
+      18: aload_1
+      19: aload_2
+      20: invokespecial #270                // Method com/jiangdg/ausbc/camera/CameraUVC."<init>":(Landroid/content/Context;Landroid/hardware/usb/UsbDevice;)V
+      23: checkcast     #160                // class com/jiangdg/ausbc/MultiCameraClient$ICamera
+      26: areturn
+
+  protected android.hardware.usb.UsbDevice getDefaultCamera();
+    Code:
+       0: aconst_null
+       1: areturn
+
+  protected final void captureImage(com.jiangdg.ausbc.callback.ICaptureCallBack, java.lang.String);
+    Code:
+       0: aload_1
+       1: ldc_w         #277                // String callBack
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore_3
+      12: aload_3
+      13: ifnonnull     19
+      16: goto          25
+      19: aload_3
+      20: aload_1
+      21: aload_2
+      22: invokevirtual #281                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.captureImage:(Lcom/jiangdg/ausbc/callback/ICaptureCallBack;Ljava/lang/String;)V
+      25: return
+
+  public static void captureImage$default(com.jiangdg.ausbc.base.CameraFragment, com.jiangdg.ausbc.callback.ICaptureCallBack, java.lang.String, int, java.lang.Object);
+    Code:
+       0: aload         4
+       2: ifnull        16
+       5: new           #288                // class java/lang/UnsupportedOperationException
+       8: dup
+       9: ldc_w         #290                // String Super calls with default arguments not supported in this target, function: captureImage
+      12: invokespecial #293                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      15: athrow
+      16: iload_3
+      17: iconst_2
+      18: iand
+      19: ifeq          24
+      22: aconst_null
+      23: astore_2
+      24: aload_0
+      25: aload_1
+      26: aload_2
+      27: invokevirtual #294                // Method captureImage:(Lcom/jiangdg/ausbc/callback/ICaptureCallBack;Ljava/lang/String;)V
+      30: return
+
+  protected final com.jiangdg.ausbc.render.effect.AbstractEffect getDefaultEffect();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          17
+      13: aload_1
+      14: invokevirtual #298                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.getDefaultEffect:()Lcom/jiangdg/ausbc/render/effect/AbstractEffect;
+      17: areturn
+
+  protected final void switchCamera(android.hardware.usb.UsbDevice);
+    Code:
+       0: aload_1
+       1: ldc_w         #303                // String usbDevice
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore_2
+      12: aload_2
+      13: ifnonnull     19
+      16: goto          23
+      19: aload_2
+      20: invokevirtual #163                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.closeCamera:()V
+      23: nop
+      24: ldc2_w        #304                // long 500l
+      27: invokestatic  #311                // Method java/lang/Thread.sleep:(J)V
+      30: goto          38
+      33: astore_2
+      34: aload_2
+      35: invokevirtual #241                // Method java/lang/Exception.printStackTrace:()V
+      38: aload_0
+      39: aload_1
+      40: invokevirtual #313                // Method requestPermission:(Landroid/hardware/usb/UsbDevice;)V
+      43: return
+    Exception table:
+       from    to  target type
+          23    30    33   Class java/lang/Exception
+
+  protected final boolean isCameraOpened();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: iconst_0
+      10: goto          19
+      13: aload_1
+      14: invokevirtual #320                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.isCameraOpened:()Z
+      17: istore_2
+      18: iload_2
+      19: ireturn
+
+  protected final void updateResolution(int, int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_3
+       5: aload_3
+       6: ifnonnull     12
+       9: goto          18
+      12: aload_3
+      13: iload_1
+      14: iload_2
+      15: invokevirtual #324                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.updateResolution:(II)V
+      18: return
+
+  protected final java.util.List<com.jiangdg.ausbc.camera.bean.PreviewSize> getAllPreviewSizes(java.lang.Double);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          18
+      13: aload_2
+      14: aload_1
+      15: invokevirtual #331                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.getAllPreviewSizes:(Ljava/lang/Double;)Ljava/util/List;
+      18: areturn
+
+  public static java.util.List getAllPreviewSizes$default(com.jiangdg.ausbc.base.CameraFragment, java.lang.Double, int, java.lang.Object);
+    Code:
+       0: aload_3
+       1: ifnull        15
+       4: new           #288                // class java/lang/UnsupportedOperationException
+       7: dup
+       8: ldc_w         #337                // String Super calls with default arguments not supported in this target, function: getAllPreviewSizes
+      11: invokespecial #293                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      14: athrow
+      15: iload_2
+      16: iconst_1
+      17: iand
+      18: ifeq          23
+      21: aconst_null
+      22: astore_1
+      23: aload_0
+      24: aload_1
+      25: invokevirtual #338                // Method getAllPreviewSizes:(Ljava/lang/Double;)Ljava/util/List;
+      28: areturn
+
+  protected final void addRenderEffect(com.jiangdg.ausbc.render.effect.AbstractEffect);
+    Code:
+       0: aload_1
+       1: ldc_w         #342                // String effect
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore_2
+      12: aload_2
+      13: ifnonnull     19
+      16: goto          24
+      19: aload_2
+      20: aload_1
+      21: invokevirtual #344                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.addRenderEffect:(Lcom/jiangdg/ausbc/render/effect/AbstractEffect;)V
+      24: return
+
+  protected final void removeRenderEffect(com.jiangdg.ausbc.render.effect.AbstractEffect);
+    Code:
+       0: aload_1
+       1: ldc_w         #342                // String effect
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore_2
+      12: aload_2
+      13: ifnonnull     19
+      16: goto          24
+      19: aload_2
+      20: aload_1
+      21: invokevirtual #348                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.removeRenderEffect:(Lcom/jiangdg/ausbc/render/effect/AbstractEffect;)V
+      24: return
+
+  protected final void updateRenderEffect(int, com.jiangdg.ausbc.render.effect.AbstractEffect);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_3
+       5: aload_3
+       6: ifnonnull     12
+       9: goto          18
+      12: aload_3
+      13: iload_1
+      14: aload_2
+      15: invokevirtual #352                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.updateRenderEffect:(ILcom/jiangdg/ausbc/render/effect/AbstractEffect;)V
+      18: return
+
+  protected final void captureStreamStart();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          16
+      12: aload_1
+      13: invokevirtual #356                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.captureStreamStart:()V
+      16: return
+
+  protected final void captureStreamStop();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          16
+      12: aload_1
+      13: invokevirtual #359                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.captureStreamStop:()V
+      16: return
+
+  protected final void setEncodeDataCallBack(com.jiangdg.ausbc.callback.IEncodeDataCallBack);
+    Code:
+       0: aload_1
+       1: ldc_w         #277                // String callBack
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore_2
+      12: aload_2
+      13: ifnonnull     19
+      16: goto          24
+      19: aload_2
+      20: aload_1
+      21: invokevirtual #363                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.setEncodeDataCallBack:(Lcom/jiangdg/ausbc/callback/IEncodeDataCallBack;)V
+      24: return
+
+  protected final void addPreviewDataCallBack(com.jiangdg.ausbc.callback.IPreviewDataCallBack);
+    Code:
+       0: aload_1
+       1: ldc_w         #277                // String callBack
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore_2
+      12: aload_2
+      13: ifnonnull     19
+      16: goto          24
+      19: aload_2
+      20: aload_1
+      21: invokevirtual #368                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.addPreviewDataCallBack:(Lcom/jiangdg/ausbc/callback/IPreviewDataCallBack;)V
+      24: return
+
+  public final void removePreviewDataCallBack(com.jiangdg.ausbc.callback.IPreviewDataCallBack);
+    Code:
+       0: aload_1
+       1: ldc_w         #277                // String callBack
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore_2
+      12: aload_2
+      13: ifnonnull     19
+      16: goto          24
+      19: aload_2
+      20: aload_1
+      21: invokevirtual #372                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.removePreviewDataCallBack:(Lcom/jiangdg/ausbc/callback/IPreviewDataCallBack;)V
+      24: return
+
+  protected final void captureVideoStart(com.jiangdg.ausbc.callback.ICaptureCallBack, java.lang.String, long);
+    Code:
+       0: aload_1
+       1: ldc_w         #277                // String callBack
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore        5
+      13: aload         5
+      15: ifnonnull     21
+      18: goto          29
+      21: aload         5
+      23: aload_1
+      24: aload_2
+      25: lload_3
+      26: invokevirtual #376                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.captureVideoStart:(Lcom/jiangdg/ausbc/callback/ICaptureCallBack;Ljava/lang/String;J)V
+      29: return
+
+  public static void captureVideoStart$default(com.jiangdg.ausbc.base.CameraFragment, com.jiangdg.ausbc.callback.ICaptureCallBack, java.lang.String, long, int, java.lang.Object);
+    Code:
+       0: aload         6
+       2: ifnull        16
+       5: new           #288                // class java/lang/UnsupportedOperationException
+       8: dup
+       9: ldc_w         #383                // String Super calls with default arguments not supported in this target, function: captureVideoStart
+      12: invokespecial #293                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      15: athrow
+      16: iload         5
+      18: iconst_2
+      19: iand
+      20: ifeq          25
+      23: aconst_null
+      24: astore_2
+      25: iload         5
+      27: iconst_4
+      28: iand
+      29: ifeq          34
+      32: lconst_0
+      33: lstore_3
+      34: aload_0
+      35: aload_1
+      36: aload_2
+      37: lload_3
+      38: invokevirtual #384                // Method captureVideoStart:(Lcom/jiangdg/ausbc/callback/ICaptureCallBack;Ljava/lang/String;J)V
+      41: return
+
+  protected final void captureVideoStop();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          16
+      12: aload_1
+      13: invokevirtual #387                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.captureVideoStop:()V
+      16: return
+
+  protected final void captureAudioStart(com.jiangdg.ausbc.callback.ICaptureCallBack, java.lang.String);
+    Code:
+       0: aload_1
+       1: ldc_w         #277                // String callBack
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore_3
+      12: aload_3
+      13: ifnonnull     19
+      16: goto          25
+      19: aload_3
+      20: aload_1
+      21: aload_2
+      22: invokevirtual #390                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.captureAudioStart:(Lcom/jiangdg/ausbc/callback/ICaptureCallBack;Ljava/lang/String;)V
+      25: return
+
+  public static void captureAudioStart$default(com.jiangdg.ausbc.base.CameraFragment, com.jiangdg.ausbc.callback.ICaptureCallBack, java.lang.String, int, java.lang.Object);
+    Code:
+       0: aload         4
+       2: ifnull        16
+       5: new           #288                // class java/lang/UnsupportedOperationException
+       8: dup
+       9: ldc_w         #393                // String Super calls with default arguments not supported in this target, function: captureAudioStart
+      12: invokespecial #293                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      15: athrow
+      16: iload_3
+      17: iconst_2
+      18: iand
+      19: ifeq          24
+      22: aconst_null
+      23: astore_2
+      24: aload_0
+      25: aload_1
+      26: aload_2
+      27: invokevirtual #394                // Method captureAudioStart:(Lcom/jiangdg/ausbc/callback/ICaptureCallBack;Ljava/lang/String;)V
+      30: return
+
+  protected final void captureAudioStop();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          16
+      12: aload_1
+      13: invokevirtual #397                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.captureAudioStop:()V
+      16: return
+
+  protected final void startPlayMic(com.jiangdg.ausbc.callback.IPlayCallBack);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          17
+      12: aload_2
+      13: aload_1
+      14: invokevirtual #401                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.startPlayMic:(Lcom/jiangdg/ausbc/callback/IPlayCallBack;)V
+      17: return
+
+  public static void startPlayMic$default(com.jiangdg.ausbc.base.CameraFragment, com.jiangdg.ausbc.callback.IPlayCallBack, int, java.lang.Object);
+    Code:
+       0: aload_3
+       1: ifnull        15
+       4: new           #288                // class java/lang/UnsupportedOperationException
+       7: dup
+       8: ldc_w         #406                // String Super calls with default arguments not supported in this target, function: startPlayMic
+      11: invokespecial #293                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      14: athrow
+      15: iload_2
+      16: iconst_1
+      17: iand
+      18: ifeq          23
+      21: aconst_null
+      22: astore_1
+      23: aload_0
+      24: aload_1
+      25: invokevirtual #407                // Method startPlayMic:(Lcom/jiangdg/ausbc/callback/IPlayCallBack;)V
+      28: return
+
+  protected final void stopPlayMic();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          16
+      12: aload_1
+      13: invokevirtual #410                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.stopPlayMic:()V
+      16: return
+
+  protected final com.jiangdg.ausbc.camera.bean.PreviewSize getCurrentPreviewSize();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          58
+      13: aload_1
+      14: invokevirtual #416                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.getCameraRequest:()Lcom/jiangdg/ausbc/camera/bean/CameraRequest;
+      17: astore_2
+      18: aload_2
+      19: ifnonnull     26
+      22: aconst_null
+      23: goto          58
+      26: aload_2
+      27: astore_3
+      28: iconst_0
+      29: istore        4
+      31: iconst_0
+      32: istore        5
+      34: aload_3
+      35: astore        6
+      37: iconst_0
+      38: istore        7
+      40: new           #418                // class com/jiangdg/ausbc/camera/bean/PreviewSize
+      43: dup
+      44: aload         6
+      46: invokevirtual #424                // Method com/jiangdg/ausbc/camera/bean/CameraRequest.getPreviewWidth:()I
+      49: aload         6
+      51: invokevirtual #427                // Method com/jiangdg/ausbc/camera/bean/CameraRequest.getPreviewHeight:()I
+      54: invokespecial #429                // Method com/jiangdg/ausbc/camera/bean/PreviewSize."<init>":(II)V
+      57: nop
+      58: areturn
+
+  protected final void setRotateType(com.jiangdg.ausbc.render.env.RotateType);
+    Code:
+       0: aload_1
+       1: ldc_w         #435                // String type
+       4: invokestatic  #264                // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       7: aload_0
+       8: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      11: astore_2
+      12: aload_2
+      13: ifnonnull     19
+      16: goto          24
+      19: aload_2
+      20: aload_1
+      21: invokevirtual #437                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.setRotateType:(Lcom/jiangdg/ausbc/render/env/RotateType;)V
+      24: return
+
+  protected final void sendCameraCommand(int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #442                // Method com/jiangdg/ausbc/camera/CameraUVC.sendCameraCommand:(I)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final void setAutoFocus(boolean);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #448                // Method com/jiangdg/ausbc/camera/CameraUVC.setAutoFocus:(Z)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final java.lang.Boolean getAutoFocus();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          50
+      13: aload_1
+      14: astore_2
+      15: iconst_0
+      16: istore_3
+      17: iconst_0
+      18: istore        4
+      20: aload_2
+      21: astore        5
+      23: iconst_0
+      24: istore        6
+      26: aload         5
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          41
+      34: iconst_0
+      35: invokestatic  #459                // Method java/lang/Boolean.valueOf:(Z)Ljava/lang/Boolean;
+      38: goto          49
+      41: aload         5
+      43: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      46: invokevirtual #461                // Method com/jiangdg/ausbc/camera/CameraUVC.getAutoFocus:()Ljava/lang/Boolean;
+      49: nop
+      50: areturn
+
+  protected final void resetAutoFocus();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          44
+      12: aload_1
+      13: astore_2
+      14: iconst_0
+      15: istore_3
+      16: iconst_0
+      17: istore        4
+      19: aload_2
+      20: astore        5
+      22: iconst_0
+      23: istore        6
+      25: aload         5
+      27: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      30: ifne          34
+      33: return
+      34: aload         5
+      36: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      39: invokevirtual #465                // Method com/jiangdg/ausbc/camera/CameraUVC.resetAutoFocus:()V
+      42: nop
+      43: nop
+      44: return
+
+  protected final void setBrightness(int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #469                // Method com/jiangdg/ausbc/camera/CameraUVC.setBrightness:(I)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final java.lang.Integer getBrightness();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          47
+      13: aload_1
+      14: astore_2
+      15: iconst_0
+      16: istore_3
+      17: iconst_0
+      18: istore        4
+      20: aload_2
+      21: astore        5
+      23: iconst_0
+      24: istore        6
+      26: aload         5
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          38
+      34: aconst_null
+      35: goto          46
+      38: aload         5
+      40: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      43: invokevirtual #475                // Method com/jiangdg/ausbc/camera/CameraUVC.getBrightness:()Ljava/lang/Integer;
+      46: nop
+      47: areturn
+
+  protected final void resetBrightness();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          44
+      12: aload_1
+      13: astore_2
+      14: iconst_0
+      15: istore_3
+      16: iconst_0
+      17: istore        4
+      19: aload_2
+      20: astore        5
+      22: iconst_0
+      23: istore        6
+      25: aload         5
+      27: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      30: ifne          34
+      33: return
+      34: aload         5
+      36: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      39: invokevirtual #481                // Method com/jiangdg/ausbc/camera/CameraUVC.resetBrightness:()V
+      42: nop
+      43: nop
+      44: return
+
+  protected final void setContrast(int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #485                // Method com/jiangdg/ausbc/camera/CameraUVC.setContrast:(I)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final java.lang.Integer getContrast();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          47
+      13: aload_1
+      14: astore_2
+      15: iconst_0
+      16: istore_3
+      17: iconst_0
+      18: istore        4
+      20: aload_2
+      21: astore        5
+      23: iconst_0
+      24: istore        6
+      26: aload         5
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          38
+      34: aconst_null
+      35: goto          46
+      38: aload         5
+      40: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      43: invokevirtual #490                // Method com/jiangdg/ausbc/camera/CameraUVC.getContrast:()Ljava/lang/Integer;
+      46: nop
+      47: areturn
+
+  protected final void resetContrast();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          44
+      12: aload_1
+      13: astore_2
+      14: iconst_0
+      15: istore_3
+      16: iconst_0
+      17: istore        4
+      19: aload_2
+      20: astore        5
+      22: iconst_0
+      23: istore        6
+      25: aload         5
+      27: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      30: ifne          34
+      33: return
+      34: aload         5
+      36: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      39: invokevirtual #494                // Method com/jiangdg/ausbc/camera/CameraUVC.resetContrast:()V
+      42: nop
+      43: nop
+      44: return
+
+  protected final void setGain(int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #498                // Method com/jiangdg/ausbc/camera/CameraUVC.setGain:(I)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final java.lang.Integer getGain();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          47
+      13: aload_1
+      14: astore_2
+      15: iconst_0
+      16: istore_3
+      17: iconst_0
+      18: istore        4
+      20: aload_2
+      21: astore        5
+      23: iconst_0
+      24: istore        6
+      26: aload         5
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          38
+      34: aconst_null
+      35: goto          46
+      38: aload         5
+      40: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      43: invokevirtual #503                // Method com/jiangdg/ausbc/camera/CameraUVC.getGain:()Ljava/lang/Integer;
+      46: nop
+      47: areturn
+
+  protected final void resetGain();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          44
+      12: aload_1
+      13: astore_2
+      14: iconst_0
+      15: istore_3
+      16: iconst_0
+      17: istore        4
+      19: aload_2
+      20: astore        5
+      22: iconst_0
+      23: istore        6
+      25: aload         5
+      27: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      30: ifne          34
+      33: return
+      34: aload         5
+      36: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      39: invokevirtual #507                // Method com/jiangdg/ausbc/camera/CameraUVC.resetGain:()V
+      42: nop
+      43: nop
+      44: return
+
+  protected final void setGamma(int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #511                // Method com/jiangdg/ausbc/camera/CameraUVC.setGamma:(I)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final java.lang.Integer getGamma();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          47
+      13: aload_1
+      14: astore_2
+      15: iconst_0
+      16: istore_3
+      17: iconst_0
+      18: istore        4
+      20: aload_2
+      21: astore        5
+      23: iconst_0
+      24: istore        6
+      26: aload         5
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          38
+      34: aconst_null
+      35: goto          46
+      38: aload         5
+      40: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      43: invokevirtual #516                // Method com/jiangdg/ausbc/camera/CameraUVC.getGamma:()Ljava/lang/Integer;
+      46: nop
+      47: areturn
+
+  protected final void resetGamma();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          44
+      12: aload_1
+      13: astore_2
+      14: iconst_0
+      15: istore_3
+      16: iconst_0
+      17: istore        4
+      19: aload_2
+      20: astore        5
+      22: iconst_0
+      23: istore        6
+      25: aload         5
+      27: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      30: ifne          34
+      33: return
+      34: aload         5
+      36: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      39: invokevirtual #520                // Method com/jiangdg/ausbc/camera/CameraUVC.resetGamma:()V
+      42: nop
+      43: nop
+      44: return
+
+  protected final void setHue(int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #524                // Method com/jiangdg/ausbc/camera/CameraUVC.setHue:(I)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final java.lang.Integer getHue();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          47
+      13: aload_1
+      14: astore_2
+      15: iconst_0
+      16: istore_3
+      17: iconst_0
+      18: istore        4
+      20: aload_2
+      21: astore        5
+      23: iconst_0
+      24: istore        6
+      26: aload         5
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          38
+      34: aconst_null
+      35: goto          46
+      38: aload         5
+      40: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      43: invokevirtual #529                // Method com/jiangdg/ausbc/camera/CameraUVC.getHue:()Ljava/lang/Integer;
+      46: nop
+      47: areturn
+
+  protected final void resetHue();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          44
+      12: aload_1
+      13: astore_2
+      14: iconst_0
+      15: istore_3
+      16: iconst_0
+      17: istore        4
+      19: aload_2
+      20: astore        5
+      22: iconst_0
+      23: istore        6
+      25: aload         5
+      27: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      30: ifne          34
+      33: return
+      34: aload         5
+      36: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      39: invokevirtual #533                // Method com/jiangdg/ausbc/camera/CameraUVC.resetHue:()V
+      42: nop
+      43: nop
+      44: return
+
+  protected final void setZoom(int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #537                // Method com/jiangdg/ausbc/camera/CameraUVC.setZoom:(I)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final java.lang.Integer getZoom();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          47
+      13: aload_1
+      14: astore_2
+      15: iconst_0
+      16: istore_3
+      17: iconst_0
+      18: istore        4
+      20: aload_2
+      21: astore        5
+      23: iconst_0
+      24: istore        6
+      26: aload         5
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          38
+      34: aconst_null
+      35: goto          46
+      38: aload         5
+      40: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      43: invokevirtual #542                // Method com/jiangdg/ausbc/camera/CameraUVC.getZoom:()Ljava/lang/Integer;
+      46: nop
+      47: areturn
+
+  protected final void resetZoom();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          44
+      12: aload_1
+      13: astore_2
+      14: iconst_0
+      15: istore_3
+      16: iconst_0
+      17: istore        4
+      19: aload_2
+      20: astore        5
+      22: iconst_0
+      23: istore        6
+      25: aload         5
+      27: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      30: ifne          34
+      33: return
+      34: aload         5
+      36: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      39: invokevirtual #546                // Method com/jiangdg/ausbc/camera/CameraUVC.resetZoom:()V
+      42: nop
+      43: nop
+      44: return
+
+  protected final void setSharpness(int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #550                // Method com/jiangdg/ausbc/camera/CameraUVC.setSharpness:(I)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final java.lang.Integer getSharpness();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          47
+      13: aload_1
+      14: astore_2
+      15: iconst_0
+      16: istore_3
+      17: iconst_0
+      18: istore        4
+      20: aload_2
+      21: astore        5
+      23: iconst_0
+      24: istore        6
+      26: aload         5
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          38
+      34: aconst_null
+      35: goto          46
+      38: aload         5
+      40: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      43: invokevirtual #555                // Method com/jiangdg/ausbc/camera/CameraUVC.getSharpness:()Ljava/lang/Integer;
+      46: nop
+      47: areturn
+
+  protected final void resetSharpness();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          44
+      12: aload_1
+      13: astore_2
+      14: iconst_0
+      15: istore_3
+      16: iconst_0
+      17: istore        4
+      19: aload_2
+      20: astore        5
+      22: iconst_0
+      23: istore        6
+      25: aload         5
+      27: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      30: ifne          34
+      33: return
+      34: aload         5
+      36: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      39: invokevirtual #559                // Method com/jiangdg/ausbc/camera/CameraUVC.resetSharpness:()V
+      42: nop
+      43: nop
+      44: return
+
+  protected final void setSaturation(int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_2
+       5: aload_2
+       6: ifnonnull     12
+       9: goto          46
+      12: aload_2
+      13: astore_3
+      14: iconst_0
+      15: istore        4
+      17: iconst_0
+      18: istore        5
+      20: aload_3
+      21: astore        6
+      23: iconst_0
+      24: istore        7
+      26: aload         6
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          35
+      34: return
+      35: aload         6
+      37: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      40: iload_1
+      41: invokevirtual #563                // Method com/jiangdg/ausbc/camera/CameraUVC.setSaturation:(I)V
+      44: nop
+      45: nop
+      46: return
+
+  protected final java.lang.Integer getSaturation();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     13
+       9: aconst_null
+      10: goto          47
+      13: aload_1
+      14: astore_2
+      15: iconst_0
+      16: istore_3
+      17: iconst_0
+      18: istore        4
+      20: aload_2
+      21: astore        5
+      23: iconst_0
+      24: istore        6
+      26: aload         5
+      28: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      31: ifne          38
+      34: aconst_null
+      35: goto          46
+      38: aload         5
+      40: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      43: invokevirtual #568                // Method com/jiangdg/ausbc/camera/CameraUVC.getSaturation:()Ljava/lang/Integer;
+      46: nop
+      47: areturn
+
+  protected final void resetSaturation();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          44
+      12: aload_1
+      13: astore_2
+      14: iconst_0
+      15: istore_3
+      16: iconst_0
+      17: istore        4
+      19: aload_2
+      20: astore        5
+      22: iconst_0
+      23: istore        6
+      25: aload         5
+      27: instanceof    #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      30: ifne          34
+      33: return
+      34: aload         5
+      36: checkcast     #267                // class com/jiangdg/ausbc/camera/CameraUVC
+      39: invokevirtual #572                // Method com/jiangdg/ausbc/camera/CameraUVC.resetSaturation:()V
+      42: nop
+      43: nop
+      44: return
+
+  protected final void openCamera(com.jiangdg.ausbc.widget.IAspectRatio);
+    Code:
+       0: aload_1
+       1: astore_2
+       2: aload_2
+       3: instanceof    #54                 // class android/view/TextureView
+       6: ifeq          13
+       9: iconst_1
+      10: goto          17
+      13: aload_2
+      14: instanceof    #60                 // class android/view/SurfaceView
+      17: ifeq          24
+      20: aload_1
+      21: goto          28
+      24: aconst_null
+      25: checkcast     #102                // class com/jiangdg/ausbc/widget/IAspectRatio
+      28: astore_2
+      29: iconst_0
+      30: istore_3
+      31: iconst_0
+      32: istore        4
+      34: aload_2
+      35: astore        5
+      37: iconst_0
+      38: istore        6
+      40: aload_0
+      41: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      44: astore        7
+      46: aload         7
+      48: ifnonnull     54
+      51: goto          65
+      54: aload         7
+      56: aload         5
+      58: aload_0
+      59: invokevirtual #576                // Method getCameraRequest:()Lcom/jiangdg/ausbc/camera/bean/CameraRequest;
+      62: invokevirtual #579                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.openCamera:(Ljava/lang/Object;Lcom/jiangdg/ausbc/camera/bean/CameraRequest;)V
+      65: aload_0
+      66: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+      69: astore        7
+      71: aload         7
+      73: ifnonnull     79
+      76: goto          88
+      79: aload         7
+      81: aload_0
+      82: checkcast     #6                  // class com/jiangdg/ausbc/callback/ICameraStateCallBack
+      85: invokevirtual #583                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.setCameraStateCallBack:(Lcom/jiangdg/ausbc/callback/ICameraStateCallBack;)V
+      88: nop
+      89: nop
+      90: return
+
+  public static void openCamera$default(com.jiangdg.ausbc.base.CameraFragment, com.jiangdg.ausbc.widget.IAspectRatio, int, java.lang.Object);
+    Code:
+       0: aload_3
+       1: ifnull        15
+       4: new           #288                // class java/lang/UnsupportedOperationException
+       7: dup
+       8: ldc_w         #590                // String Super calls with default arguments not supported in this target, function: openCamera
+      11: invokespecial #293                // Method java/lang/UnsupportedOperationException."<init>":(Ljava/lang/String;)V
+      14: athrow
+      15: iload_2
+      16: iconst_1
+      17: iand
+      18: ifeq          23
+      21: aconst_null
+      22: astore_1
+      23: aload_0
+      24: aload_1
+      25: invokevirtual #592                // Method openCamera:(Lcom/jiangdg/ausbc/widget/IAspectRatio;)V
+      28: return
+
+  protected final void closeCamera();
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_1
+       5: aload_1
+       6: ifnonnull     12
+       9: goto          16
+      12: aload_1
+      13: invokevirtual #163                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.closeCamera:()V
+      16: return
+
+  private final void surfaceSizeChanged(int, int);
+    Code:
+       0: aload_0
+       1: invokevirtual #279                // Method getCurrentCamera:()Lcom/jiangdg/ausbc/MultiCameraClient$ICamera;
+       4: astore_3
+       5: aload_3
+       6: ifnonnull     12
+       9: goto          18
+      12: aload_3
+      13: iload_1
+      14: iload_2
+      15: invokevirtual #596                // Method com/jiangdg/ausbc/MultiCameraClient$ICamera.setRenderSize:(II)V
+      18: return
+
+  private final android.view.ViewGroup$LayoutParams getViewLayoutParams(android.view.ViewGroup);
+    Code:
+       0: aload_1
+       1: astore_2
+       2: aload_2
+       3: instanceof    #600                // class android/widget/FrameLayout
+       6: ifeq          28
+       9: new           #602                // class android/widget/FrameLayout$LayoutParams
+      12: dup
+      13: iconst_m1
+      14: iconst_m1
+      15: aload_0
+      16: invokevirtual #605                // Method getGravity:()I
+      19: invokespecial #608                // Method android/widget/FrameLayout$LayoutParams."<init>":(III)V
+      22: checkcast     #610                // class android/view/ViewGroup$LayoutParams
+      25: goto          193
+      28: aload_2
+      29: instanceof    #612                // class android/widget/LinearLayout
+      32: ifeq          74
+      35: new           #614                // class android/widget/LinearLayout$LayoutParams
+      38: dup
+      39: iconst_m1
+      40: iconst_m1
+      41: invokespecial #615                // Method android/widget/LinearLayout$LayoutParams."<init>":(II)V
+      44: astore_3
+      45: iconst_0
+      46: istore        4
+      48: iconst_0
+      49: istore        5
+      51: aload_3
+      52: astore        6
+      54: iconst_0
+      55: istore        7
+      57: aload         6
+      59: aload_0
+      60: invokevirtual #605                // Method getGravity:()I
+      63: putfield      #618                // Field android/widget/LinearLayout$LayoutParams.gravity:I
+      66: nop
+      67: aload_3
+      68: checkcast     #610                // class android/view/ViewGroup$LayoutParams
+      71: goto          193
+      74: aload_2
+      75: instanceof    #620                // class android/widget/RelativeLayout
+      78: ifeq          182
+      81: new           #622                // class android/widget/RelativeLayout$LayoutParams
+      84: dup
+      85: iconst_m1
+      86: iconst_m1
+      87: invokespecial #623                // Method android/widget/RelativeLayout$LayoutParams."<init>":(II)V
+      90: astore_3
+      91: iconst_0
+      92: istore        4
+      94: iconst_0
+      95: istore        5
+      97: aload_3
+      98: astore        6
+     100: iconst_0
+     101: istore        7
+     103: aload_0
+     104: invokevirtual #605                // Method getGravity:()I
+     107: istore        8
+     109: iload         8
+     111: lookupswitch  { // 2
+                    48: 136
+                    80: 147
+               default: 158
+          }
+     136: aload         6
+     138: bipush        10
+     140: iconst_m1
+     141: invokevirtual #626                // Method android/widget/RelativeLayout$LayoutParams.addRule:(II)V
+     144: goto          174
+     147: aload         6
+     149: bipush        12
+     151: iconst_m1
+     152: invokevirtual #626                // Method android/widget/RelativeLayout$LayoutParams.addRule:(II)V
+     155: goto          174
+     158: aload         6
+     160: bipush        14
+     162: iconst_m1
+     163: invokevirtual #626                // Method android/widget/RelativeLayout$LayoutParams.addRule:(II)V
+     166: aload         6
+     168: bipush        15
+     170: iconst_m1
+     171: invokevirtual #626                // Method android/widget/RelativeLayout$LayoutParams.addRule:(II)V
+     174: nop
+     175: aload_3
+     176: checkcast     #610                // class android/view/ViewGroup$LayoutParams
+     179: goto          193
+     182: new           #628                // class java/lang/IllegalArgumentException
+     185: dup
+     186: ldc_w         #630                // String Unsupported container view, you can use FrameLayout or LinearLayout or RelativeLayout
+     189: invokespecial #631                // Method java/lang/IllegalArgumentException."<init>":(Ljava/lang/String;)V
+     192: athrow
+     193: areturn
+
+  protected abstract com.jiangdg.ausbc.widget.IAspectRatio getCameraView();
+
+  protected abstract android.view.ViewGroup getCameraViewContainer();
+
+  protected int getGravity();
+    Code:
+       0: bipush        17
+       2: ireturn
+
+  protected com.jiangdg.ausbc.camera.bean.CameraRequest getCameraRequest();
+    Code:
+       0: new           #640                // class com/jiangdg/ausbc/camera/bean/CameraRequest$Builder
+       3: dup
+       4: invokespecial #641                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder."<init>":()V
+       7: sipush        640
+      10: invokevirtual #645                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.setPreviewWidth:(I)Lcom/jiangdg/ausbc/camera/bean/CameraRequest$Builder;
+      13: sipush        480
+      16: invokevirtual #648                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.setPreviewHeight:(I)Lcom/jiangdg/ausbc/camera/bean/CameraRequest$Builder;
+      19: getstatic     #654                // Field com/jiangdg/ausbc/camera/bean/CameraRequest$RenderMode.OPENGL:Lcom/jiangdg/ausbc/camera/bean/CameraRequest$RenderMode;
+      22: invokevirtual #658                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.setRenderMode:(Lcom/jiangdg/ausbc/camera/bean/CameraRequest$RenderMode;)Lcom/jiangdg/ausbc/camera/bean/CameraRequest$Builder;
+      25: getstatic     #663                // Field com/jiangdg/ausbc/render/env/RotateType.ANGLE_0:Lcom/jiangdg/ausbc/render/env/RotateType;
+      28: invokevirtual #667                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.setDefaultRotateType:(Lcom/jiangdg/ausbc/render/env/RotateType;)Lcom/jiangdg/ausbc/camera/bean/CameraRequest$Builder;
+      31: getstatic     #673                // Field com/jiangdg/ausbc/camera/bean/CameraRequest$AudioSource.SOURCE_SYS_MIC:Lcom/jiangdg/ausbc/camera/bean/CameraRequest$AudioSource;
+      34: invokevirtual #677                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.setAudioSource:(Lcom/jiangdg/ausbc/camera/bean/CameraRequest$AudioSource;)Lcom/jiangdg/ausbc/camera/bean/CameraRequest$Builder;
+      37: getstatic     #683                // Field com/jiangdg/ausbc/camera/bean/CameraRequest$PreviewFormat.FORMAT_MJPEG:Lcom/jiangdg/ausbc/camera/bean/CameraRequest$PreviewFormat;
+      40: invokevirtual #687                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.setPreviewFormat:(Lcom/jiangdg/ausbc/camera/bean/CameraRequest$PreviewFormat;)Lcom/jiangdg/ausbc/camera/bean/CameraRequest$Builder;
+      43: iconst_1
+      44: invokevirtual #691                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.setAspectRatioShow:(Z)Lcom/jiangdg/ausbc/camera/bean/CameraRequest$Builder;
+      47: iconst_0
+      48: invokevirtual #694                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.setCaptureRawImage:(Z)Lcom/jiangdg/ausbc/camera/bean/CameraRequest$Builder;
+      51: iconst_0
+      52: invokevirtual #697                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.setRawPreviewData:(Z)Lcom/jiangdg/ausbc/camera/bean/CameraRequest$Builder;
+      55: invokevirtual #700                // Method com/jiangdg/ausbc/camera/bean/CameraRequest$Builder.create:()Lcom/jiangdg/ausbc/camera/bean/CameraRequest;
+      58: areturn
+
+  public static final java.util.HashMap access$getMCameraMap$p(com.jiangdg.ausbc.base.CameraFragment);
+    Code:
+       0: aload_0
+       1: getfield      #17                 // Field mCameraMap:Ljava/util/HashMap;
+       4: areturn
+
+  public static final java.util.concurrent.atomic.AtomicBoolean access$getMRequestPermission(com.jiangdg.ausbc.base.CameraFragment);
+    Code:
+       0: aload_0
+       1: invokespecial #247                // Method getMRequestPermission:()Ljava/util/concurrent/atomic/AtomicBoolean;
+       4: areturn
+
+  public static final com.jiangdg.ausbc.utils.SettableFuture access$getMCurrentCamera$p(com.jiangdg.ausbc.base.CameraFragment);
+    Code:
+       0: aload_0
+       1: getfield      #224                // Field mCurrentCamera:Lcom/jiangdg/ausbc/utils/SettableFuture;
+       4: areturn
+
+  public static final void access$setMCurrentCamera$p(com.jiangdg.ausbc.base.CameraFragment, com.jiangdg.ausbc.utils.SettableFuture);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: putfield      #224                // Field mCurrentCamera:Lcom/jiangdg/ausbc/utils/SettableFuture;
+       5: return
+
+  public static final com.jiangdg.ausbc.widget.IAspectRatio access$getMCameraView$p(com.jiangdg.ausbc.base.CameraFragment);
+    Code:
+       0: aload_0
+       1: getfield      #68                 // Field mCameraView:Lcom/jiangdg/ausbc/widget/IAspectRatio;
+       4: areturn
+
+  public static final void access$surfaceSizeChanged(com.jiangdg.ausbc.base.CameraFragment, int, int);
+    Code:
+       0: aload_0
+       1: iload_1
+       2: iload_2
+       3: invokespecial #716                // Method surfaceSizeChanged:(II)V
+       6: return
+
+  static {};
+    Code:
+       0: new           #719                // class com/jiangdg/ausbc/base/CameraFragment$Companion
+       3: dup
+       4: aconst_null
+       5: invokespecial #722                // Method com/jiangdg/ausbc/base/CameraFragment$Companion."<init>":(Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+       8: putstatic     #726                // Field Companion:Lcom/jiangdg/ausbc/base/CameraFragment$Companion;
+      11: return
+}

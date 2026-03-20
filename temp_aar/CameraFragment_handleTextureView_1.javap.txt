@@ -1,0 +1,53 @@
+Compiled from "CameraFragment.kt"
+public final class com.jiangdg.ausbc.base.CameraFragment$handleTextureView$1 implements android.view.TextureView$SurfaceTextureListener {
+  final com.jiangdg.ausbc.base.CameraFragment this$0;
+
+  com.jiangdg.ausbc.base.CameraFragment$handleTextureView$1(com.jiangdg.ausbc.base.CameraFragment);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: putfield      #12                 // Field this$0:Lcom/jiangdg/ausbc/base/CameraFragment;
+       5: aload_0
+       6: invokespecial #15                 // Method java/lang/Object."<init>":()V
+       9: return
+
+  public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture, int, int);
+    Code:
+       0: aload_1
+       1: ldc           #23                 // String surface
+       3: invokestatic  #29                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       6: aload_0
+       7: getfield      #12                 // Field this$0:Lcom/jiangdg/ausbc/base/CameraFragment;
+      10: invokevirtual #34                 // Method com/jiangdg/ausbc/base/CameraFragment.registerMultiCamera:()V
+      13: return
+
+  public void onSurfaceTextureSizeChanged(android.graphics.SurfaceTexture, int, int);
+    Code:
+       0: aload_1
+       1: ldc           #23                 // String surface
+       3: invokestatic  #29                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       6: aload_0
+       7: getfield      #12                 // Field this$0:Lcom/jiangdg/ausbc/base/CameraFragment;
+      10: iload_2
+      11: iload_3
+      12: invokestatic  #43                 // Method com/jiangdg/ausbc/base/CameraFragment.access$surfaceSizeChanged:(Lcom/jiangdg/ausbc/base/CameraFragment;II)V
+      15: return
+
+  public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture);
+    Code:
+       0: aload_1
+       1: ldc           #23                 // String surface
+       3: invokestatic  #29                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       6: aload_0
+       7: getfield      #12                 // Field this$0:Lcom/jiangdg/ausbc/base/CameraFragment;
+      10: invokevirtual #48                 // Method com/jiangdg/ausbc/base/CameraFragment.unRegisterMultiCamera:()V
+      13: iconst_0
+      14: ireturn
+
+  public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture);
+    Code:
+       0: aload_1
+       1: ldc           #23                 // String surface
+       3: invokestatic  #29                 // Method kotlin/jvm/internal/Intrinsics.checkNotNullParameter:(Ljava/lang/Object;Ljava/lang/String;)V
+       6: return
+}

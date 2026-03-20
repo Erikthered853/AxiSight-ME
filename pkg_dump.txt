@@ -1,0 +1,332 @@
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        8286759 com.etrsystems.axisight/.MainActivity filter 874f1e
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      androidx.profileinstaller.action.SAVE_PROFILE:
+        2ec03ff com.etrsystems.axisight/androidx.profileinstaller.ProfileInstallReceiver filter e553f2a
+          Action: "androidx.profileinstaller.action.SAVE_PROFILE"
+      androidx.profileinstaller.action.INSTALL_PROFILE:
+        2ec03ff com.etrsystems.axisight/androidx.profileinstaller.ProfileInstallReceiver filter def95cc
+          Action: "androidx.profileinstaller.action.INSTALL_PROFILE"
+      androidx.profileinstaller.action.SKIP_FILE:
+        2ec03ff com.etrsystems.axisight/androidx.profileinstaller.ProfileInstallReceiver filter 66f2015
+          Action: "androidx.profileinstaller.action.SKIP_FILE"
+      androidx.profileinstaller.action.BENCHMARK_OPERATION:
+        2ec03ff com.etrsystems.axisight/androidx.profileinstaller.ProfileInstallReceiver filter 806e11b
+          Action: "androidx.profileinstaller.action.BENCHMARK_OPERATION"
+
+Domain verification status:
+
+Permissions:
+  Permission [com.etrsystems.axisight.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION] (fae7ec):
+    sourcePackage=com.etrsystems.axisight
+    uid=10686 gids=[] type=0 prot=signature
+    perm=PermissionInfo{a06d7b5 com.etrsystems.axisight.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION}
+    flags=0x0
+
+Registered ContentProviders:
+  com.etrsystems.axisight/com.google.firebase.provider.FirebaseInitProvider:
+    Provider{5a12e4a com.etrsystems.axisight/com.google.firebase.provider.FirebaseInitProvider}
+  com.etrsystems.axisight/androidx.startup.InitializationProvider:
+    Provider{8f771bb com.etrsystems.axisight/androidx.startup.InitializationProvider}
+
+ContentProvider Authorities:
+  [com.etrsystems.axisight.firebaseinitprovider]:
+    Provider{5a12e4a com.etrsystems.axisight/com.google.firebase.provider.FirebaseInitProvider}
+      applicationInfo=ApplicationInfo{7a496d8 com.etrsystems.axisight}
+  [com.etrsystems.axisight.androidx-startup]:
+    Provider{8f771bb com.etrsystems.axisight/androidx.startup.InitializationProvider}
+      applicationInfo=ApplicationInfo{a1a3a31 com.etrsystems.axisight}
+
+Key Set Manager:
+  [com.etrsystems.axisight]
+      Signing KeySets: 415
+
+Packages:
+  Package [com.etrsystems.axisight] (d6a09fc):
+    appId=10686
+    pkg=Package{dcbe516 com.etrsystems.axisight}
+    codePath=/data/app/~~0jTl2GHTGX9K_IFgBaAUkA==/com.etrsystems.axisight-EbyMs4khuhAtOqKsCdFWtQ==
+    resourcePath=/data/app/~~0jTl2GHTGX9K_IFgBaAUkA==/com.etrsystems.axisight-EbyMs4khuhAtOqKsCdFWtQ==
+    legacyNativeLibraryDir=/data/app/~~0jTl2GHTGX9K_IFgBaAUkA==/com.etrsystems.axisight-EbyMs4khuhAtOqKsCdFWtQ==/lib
+    extractNativeLibs=false
+    primaryCpuAbi=arm64-v8a
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=1 minSdk=26 targetSdk=34
+    minExtensionVersions=[]
+    versionName=0.1.0
+    hiddenApiEnforcementPolicy=2
+    usesNonSdkApi=false
+    splits=[base]
+    apkSigningVersion=2
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PARTIALLY_DIRECT_BOOT_AWARE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    pageSizeCompat=0
+    scannedAsStoppedSystemApp=false
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    usesOptionalLibraries:
+      android.ext.adservices
+    timeStamp=2026-02-07 15:12:09
+    lastUpdateTime=2026-02-07 15:12:10
+    installerPackageName=null
+    installerPackageUid=-1
+    initiatingPackageName=com.android.shell
+    originatingPackageName=null
+    category=manifest: -1, override: -1, by user: -1
+    packageSource=1
+    appMetadataFilePath=null
+    appMetadataSource=0
+    signatures=PackageSignatures{4a16e97 version:2, signatures:[44efdcd9], past signatures:[]}
+    installPermissionsFixed=false
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    privatePkgFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PARTIALLY_DIRECT_BOOT_AWARE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    apexModuleName=null
+    componentsDeclared=13
+    declared permissions:
+      com.etrsystems.axisight.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: prot=signature
+    requested permissions:
+      com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE
+      com.etrsystems.axisight.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+      android.permission.ACCESS_ADSERVICES_AD_ID
+      android.permission.INTERNET
+      android.permission.ACCESS_NETWORK_STATE
+      android.permission.CAMERA
+      android.permission.ACCESS_ADSERVICES_ATTRIBUTION
+      com.google.android.gms.permission.AD_ID
+      android.permission.WAKE_LOCK
+    install permissions:
+      com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE: granted=true
+      com.etrsystems.axisight.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: granted=true
+      android.permission.ACCESS_ADSERVICES_AD_ID: granted=true
+      android.permission.INTERNET: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+      android.permission.ACCESS_ADSERVICES_ATTRIBUTION: granted=true
+      com.google.android.gms.permission.AD_ID: granted=true
+      android.permission.WAKE_LOCK: granted=true
+    User 0: ceDataInode=965382 deDataInode=640545 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false quarantined=false
+      installReason=0
+      dataDir=/data/user/0/com.etrsystems.axisight
+      firstInstallTime=2026-02-07 03:47:21
+      uninstallReason=0
+      overlay paths:
+        /product/overlay/NavigationBarModeGestural/NavigationBarModeGesturalOverlay.apk
+        /data/resource-cache/com.android.systemui-dynamic-00Cw.frro
+        /data/resource-cache/android-SemWT_G_MonetPalette-qcOb.frro
+      legacy overlay paths:
+        /product/overlay/NavigationBarModeGestural/NavigationBarModeGesturalOverlay.apk
+      gids=[3003]
+      runtime permissions:
+        android.permission.CAMERA: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+    User 150: ceDataInode=0 deDataInode=0 installed=false hidden=false suspended=false distractionFlags=0 stopped=true notLaunched=true enabled=0 instant=false virtual=false quarantined=false
+      installReason=0
+      dataDir=null
+      firstInstallTime=2026-02-07 03:47:21
+      uninstallReason=0
+      gids=[3003]
+      runtime permissions:
+
+Queries:
+  system apps queryable: false
+  queries via forceQueryable:
+  queries via package name:
+  queries via component:
+    com.samsung.android.bixby.agent:
+      com.etrsystems.axisight
+    com.android.settings.intelligence:
+      com.etrsystems.axisight
+    co.vulcanlabs.printer:
+      com.etrsystems.axisight
+    com.google.android.apps.accessibility.voiceaccess:
+      com.etrsystems.axisight
+    com.google.android.as:
+      com.etrsystems.axisight
+    com.google.android.as.oss:
+      com.etrsystems.axisight
+    [com.samsung.android.waterplugin,com.samsung.android.app.watchmanager]:
+      com.etrsystems.axisight
+    com.facebook.katana:
+      com.etrsystems.axisight
+    com.samsung.android.spay:
+      com.etrsystems.axisight
+    com.microsoft.office.outlook:
+      com.etrsystems.axisight
+    com.amazon.mShop.android.shopping:
+      com.etrsystems.axisight
+    com.samsung.wearable.watch7plugin:
+      com.etrsystems.axisight
+    com.PYOPYO.StarTracker:
+      com.etrsystems.axisight
+    com.adobe.reader:
+      com.etrsystems.axisight
+    com.airbnb.android:
+      com.etrsystems.axisight
+    com.ally.MobileBanking:
+      com.etrsystems.axisight
+    com.autodesk.fusion:
+      com.etrsystems.axisight
+    com.creditonebank.mobile:
+      com.etrsystems.axisight
+    com.facebook.orca:
+      com.etrsystems.axisight
+    com.instagram.android:
+      com.etrsystems.axisight
+    com.priceline.android.negotiator:
+      com.etrsystems.axisight
+    com.sgmediapp.gcam:
+      com.etrsystems.axisight
+    com.snapchat.android:
+      com.etrsystems.axisight
+    com.tumblr:
+      com.etrsystems.axisight
+    com.vitastudio.solitaire:
+      com.etrsystems.axisight
+    jp.co.canon.bsd.ad.pixmaprint:
+      com.etrsystems.axisight
+    net.oklok.dbd:
+      com.etrsystems.axisight
+    com.samsung.android.email.provider:
+      com.etrsystems.axisight
+    com.zhiliaoapp.musically:
+      com.etrsystems.axisight
+    com.sony.songpal.mdr:
+      com.etrsystems.axisight
+    com.sony.songpal:
+      com.etrsystems.axisight
+  queryable via interaction:
+    User 0:
+      [com.qualcomm.qti.services.systemhelper,com.samsung.android.aircommandmanager,com.samsung.accessibility,com.samsung.android.simagent,com.sec.android.emergencylauncher,android,com.sec.mhs.smarttethering,com.samsung.android.fmm,com.sec.bcservice,com.samsung.android.themecenter,com.samsung.aasaservice,com.sec.android.app.servicemodeapp,com.android.server.telecom,com.samsung.android.smartface,com.samsung.android.vexfwk.service,com.samsung.android.da.daagent,com.samsung.sdm,com.samsung.android.dck.timesync,com.sec.usbsettings,com.sec.android.app.quicktool,com.sec.android.app.wlantest,com.sec.facatfunction,com.samsung.android.bbc.bbcagent,com.samsung.android.emergency,com.android.keychain,com.samsung.sait.sohservice,com.samsung.euicc,com.sec.android.iaft,com.skms.android.agent,com.sec.android.app.uwbtest,com.samsung.android.app.omcagent,com.sec.android.sdhms,com.sec.imsservice,com.android.settings,com.samsung.android.globalpostprocmgr,com.sec.imslogger,com.qti.snapdragon.qdcm_ff,com.samsung.android.wifi.ai,com.samsung.android.qmdservice,com.samsung.android.app.dressroom,com.sec.android.smartfpsadjuster,com.samsung.android.knox.pushmanager,com.samsung.android.knox.attestation,com.samsung.android.biometrics.app.setting,com.samsung.oda.service,com.samsung.android.vtcamerasettings,com.samsung.SMT,com.sec.android.app.factorykeystring,com.samsung.android.camerasdkservice,com.sec.android.app.personalization,com.sec.android.CcInfo,com.sem.factoryapp,com.sec.android.app.RilPhoneNumberService,com.samsung.android.mdecservice,com.samsung.android.smartswitchassistant,com.android.dynsystem,com.samsung.android.ese,com.sec.android.Cdfs,com.samsung.drm,com.android.location.fused,com.samsung.android.stickercenter,com.wssyncmldm,com.sec.android.diagmonagent,com.samsung.android.wifi.intelligence,com.samsung.android.sead,com.android.localtransport,com.samsung.android.forest,com.samsung.android.lool,com.samsung.android.knox.mpos,com.samsung.android.hdmapp,com.android.providers.settings,com.samsung.android.svcagent,com.samsung.android.bixby.wakeup,com.samsung.android.providers.factory,com.sec.android.app.desktoplauncher,com.samsung.gpuwatchapp,com.sec.automation,com.samsung.android.photoremasterservice,com.samsung.android.motionphoto.app,com.sec.factory.camera,com.samsung.ts43authservice,com.android.inputdevices,com.sec.android.app.parser,com.samsung.android.provider.filterprovider,com.sec.sve,com.samsung.android.dqagent,com.sec.app.RilErrorNotifier,com.sec.android.app.setupwizard,com.samsung.InputEventApp,com.samsung.android.cameraxservice,com.samsung.android.app.esimkeystring,com.sec.android.soagent,com.samsung.android.brightnessbackupservice,com.sec.epdg,com.sec.android.app.SecSetupWizard,com.samsung.unifiedtp,com.samsung.android.knox.zt.framework,com.sec.modem.settings,com.sec.android.app.hwmoduletest]:
+        com.etrsystems.axisight
+      [com.google.android.gms,com.google.android.gsf]:
+        com.etrsystems.axisight
+      com.google.android.inputmethod.latin:
+        com.etrsystems.axisight
+      com.etrsystems.axisight:
+        [com.qualcomm.qti.services.systemhelper,com.samsung.android.aircommandmanager,com.samsung.accessibility,com.samsung.android.simagent,com.sec.android.emergencylauncher,android,com.sec.mhs.smarttethering,com.samsung.android.fmm,com.sec.bcservice,com.samsung.android.themecenter,com.samsung.aasaservice,com.sec.android.app.servicemodeapp,com.android.server.telecom,com.samsung.android.smartface,com.samsung.android.vexfwk.service,com.samsung.android.da.daagent,com.samsung.sdm,com.samsung.android.dck.timesync,com.sec.usbsettings,com.sec.android.app.quicktool,com.sec.android.app.wlantest,com.sec.facatfunction,com.samsung.android.bbc.bbcagent,com.samsung.android.emergency,com.android.keychain,com.samsung.sait.sohservice,com.samsung.euicc,com.sec.android.iaft,com.skms.android.agent,com.sec.android.app.uwbtest,com.samsung.android.app.omcagent,com.sec.android.sdhms,com.sec.imsservice,com.android.settings,com.samsung.android.globalpostprocmgr,com.sec.imslogger,com.qti.snapdragon.qdcm_ff,com.samsung.android.wifi.ai,com.samsung.android.qmdservice,com.samsung.android.app.dressroom,com.sec.android.smartfpsadjuster,com.samsung.android.knox.pushmanager,com.samsung.android.knox.attestation,com.samsung.android.biometrics.app.setting,com.samsung.oda.service,com.samsung.android.vtcamerasettings,com.samsung.SMT,com.sec.android.app.factorykeystring,com.samsung.android.camerasdkservice,com.sec.android.app.personalization,com.sec.android.CcInfo,com.sem.factoryapp,com.sec.android.app.RilPhoneNumberService,com.samsung.android.mdecservice,com.samsung.android.smartswitchassistant,com.android.dynsystem,com.samsung.android.ese,com.sec.android.Cdfs,com.samsung.drm,com.android.location.fused,com.samsung.android.stickercenter,com.wssyncmldm,com.sec.android.diagmonagent,com.samsung.android.wifi.intelligence,com.samsung.android.sead,com.android.localtransport,com.samsung.android.forest,com.samsung.android.lool,com.samsung.android.knox.mpos,com.samsung.android.hdmapp,com.android.providers.settings,com.samsung.android.svcagent,com.samsung.android.bixby.wakeup,com.samsung.android.providers.factory,com.sec.android.app.desktoplauncher,com.samsung.gpuwatchapp,com.sec.automation,com.samsung.android.photoremasterservice,com.samsung.android.motionphoto.app,com.sec.factory.camera,com.samsung.ts43authservice,com.android.inputdevices,com.sec.android.app.parser,com.samsung.android.provider.filterprovider,com.sec.sve,com.samsung.android.dqagent,com.sec.app.RilErrorNotifier,com.sec.android.app.setupwizard,com.samsung.InputEventApp,com.samsung.android.cameraxservice,com.samsung.android.app.esimkeystring,com.sec.android.soagent,com.samsung.android.brightnessbackupservice,com.sec.epdg,com.sec.android.app.SecSetupWizard,com.samsung.unifiedtp,com.samsung.android.knox.zt.framework,com.sec.modem.settings,com.sec.android.app.hwmoduletest]
+    User 150:
+  queryable via uses-library:
+
+Dexopt state:
+  [com.etrsystems.axisight]
+    path: /data/app/~~0jTl2GHTGX9K_IFgBaAUkA==/com.etrsystems.axisight-EbyMs4khuhAtOqKsCdFWtQ==/base.apk
+      arm64: [status=run-from-apk] [reason=unknown] [primary-abi]
+        [location is error]
+
+SPEG state:
+  Event #0: 06-01-2026 17:32:28.492 Success org.chromium.webapk.a59f9e4ec330f19e3_v2 took 2142 ms
+
+Profile utilization state:
+  Current state:
+    Version: 2.1.1
+    Start reason: boot-no-update
+    Start time: not started
+    Finish time: not finished
+    PU_StatusWatcher:
+      Initial thermal status: 0
+      Thermal status: 0
+      Screen off: false
+      Low battery: true
+    PU_DexoptTrigger:
+      Dexopt concurrency: 4
+      Dexopting: false
+    PU_Storage:
+      Stored apps:
+        com.android.chrome 76
+        com.android.settings 94
+        com.sec.android.app.camera 97
+        com.google.android.apps.messaging 100
+        com.zhiliaoapp.musically 100
+        com.facebook.katana 101
+        com.amazon.mShop.android.shopping 109
+        com.google.android.googlequicksearchbox 110
+        com.samsung.android.dialer 113
+        net.zedge.android 117
+        com.google.android.youtube 118
+        com.samsung.android.voc 125
+        com.sec.android.easyMover 125
+        com.samsung.vvm 129
+        com.google.android.apps.youtube.music 130
+        com.sec.android.app.sbrowser 131
+        com.google.android.gm 132
+        com.instagram.android 140
+        com.samsung.android.bixby.agent 140
+        com.samsung.android.scloud 141
+        com.samsung.android.app.routines 143
+        com.samsung.android.app.watchmanager 144
+        com.samsung.android.app.contacts 145
+        com.microsoft.office.outlook 153
+        com.samsung.android.app.reminder 157
+        com.waze 163
+        com.tumblr 165
+        com.google.android.apps.photos 168
+        com.google.android.apps.tachyon 173
+        com.google.android.calendar 175
+        com.dominospizza 179
+        com.android.vending 180
+        com.azure.authenticator 181
+        com.google.android.apps.chromecast.app 184
+        com.att.dh 210
+        com.doordash.driverapp 210
+        com.samsung.android.shealthmonitor 210
+    Stored PU state:
+      Service:
+        Version: 2.1.1
+        Start reason: boot-after-ota
+        Start time: Wed Jan 21 04:13:13 EST 2026 ts=1768986793773
+        Finish time: Wed Jan 21 04:27:16 EST 2026 ts=1768987636406
+        Took time 842sec
+      Watcher:
+        Initial thermal status: 1
+        Thermal status: 0
+        Screen off: true
+        Low battery: false
+      Trigger:
+        Dexopt concurrency: 4
+        Dexopting: false
+        Hot apps list:
+          com.android.chrome, w=76, s=OPTIMIZED, optTimeMs=1768986944143, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=261, filter=speed-profile], [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=3039, filter=speed], [primaryDex=true, reason=vdex, dex2oatTimeMs=0, filter=verify], [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=749, filter=speed-profile], [primaryDex=true, reason=vdex, dex2oatTimeMs=0, filter=verify], [primaryDex=true, reason=vdex, dex2oatTimeMs=0, filter=verify]
+          com.android.settings, w=94, s=OPTIMIZED, optTimeMs=1768986860389, cancelCount=0, dexopt=SKIPPED, [primaryDex=true, reason=vdex, dex2oatTimeMs=0, filter=verify]
+          com.sec.android.app.camera, w=97, s=OPTIMIZED, optTimeMs=1768986860389, cancelCount=0, dexopt=SKIPPED, [primaryDex=true, reason=boot-after-ota, dex2oatTimeMs=0, filter=speed-profile]
+          com.google.android.apps.messaging, w=100, s=OPTIMIZED, optTimeMs=1768987049755, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=23787, filter=speed-profile]
+          com.zhiliaoapp.musically, w=100, s=OPTIMIZED, optTimeMs=1768987198764, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=37997, filter=speed-profile], [primaryDex=true, reason=vdex, dex2oatTimeMs=0, filter=verify], [primaryDex=true, reason=vdex, dex2oatTimeMs=0, filter=verify]
+          com.facebook.katana, w=101, s=OPTIMIZED, optTimeMs=1768987109766, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=24541, filter=speed-profile]
+          com.amazon.mShop.android.shopping, w=109, s=OPTIMIZED, optTimeMs=1768987049705, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=18951, filter=speed-profile]
+          com.google.android.googlequicksearchbox, w=110, s=OPTIMIZED, optTimeMs=1768987189167, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=9830, filter=speed-profile]
+          com.samsung.android.dialer, w=113, s=OPTIMIZED, optTimeMs=1768987049786, cancelCount=0, dexopt=SKIPPED, [primaryDex=true, reason=boot-after-ota, dex2oatTimeMs=0, filter=speed-profile]
+          net.zedge.android, w=117, s=OPTIMIZED, optTimeMs=1768987161569, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=3779, filter=speed-profile]
+          com.google.android.youtube, w=118, s=OPTIMIZED, optTimeMs=1768987193533, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=12946, filter=speed-profile]
+          com.samsung.android.voc, w=125, s=OPTIMIZED, optTimeMs=1768987189195, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=5519, filter=speed-profile]
+          com.sec.android.easyMover, w=125, s=OPTIMIZED, optTimeMs=1768987199281, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=9958, filter=speed-profile]
+          com.samsung.vvm, w=129, s=OPTIMIZED, optTimeMs=1768987198863, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=9610, filter=speed-profile]
+          com.google.android.apps.youtube.music, w=130, s=OPTIMIZED, optTimeMs=1768987522400, cancelCount=1, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=5003, filter=speed-profile]
+          com.sec.android.app.sbrowser, w=131, s=OPTIMIZED, optTimeMs=1768987199971, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=1119, filter=speed-profile]
+          com.google.android.gm, w=132, s=OPTIMIZED, optTimeMs=1768987585875, cancelCount=1, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=9035, filter=speed-profile]
+          com.instagram.android, w=140, s=OPTIMIZED, optTimeMs=1768987601780, cancelCount=1, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=11836, filter=speed-profile]
+          com.samsung.android.bixby.agent, w=140, s=OPTIMIZED, optTimeMs=1768987521460, cancelCount=1, dexopt=FAILED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=4011, filter=speed-profile], [primaryDex=false, reason=vdex, dex2oatTimeMs=0, filter=verify], [primaryDex=false, reason=error, dex2oatTimeMs=0, filter=verify]
+          com.samsung.android.scloud, w=141, s=OPTIMIZED, optTimeMs=1768987571680, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=3166, filter=speed-profile]
+          com.samsung.android.app.routines, w=143, s=OPTIMIZED, optTimeMs=1768987636406, cancelCount=0, dexopt=FAILED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=9835, filter=speed], [primaryDex=false, reason=error, dex2oatTimeMs=0, filter=verify], [primaryDex=false, reason=vdex, dex2oatTimeMs=0, filter=verify]
+          com.samsung.android.app.watchmanager, w=144, s=OPTIMIZED, optTimeMs=1768987574461, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=820, filter=speed-profile]
+          com.samsung.android.app.contacts, w=145, s=OPTIMIZED, optTimeMs=1768987589974, cancelCount=0, dexopt=PERFORMED, [primaryDex=true, reason=profile-utilization, dex2oatTimeMs=1337, filter=speed-profile]
+    Stored SCPM state:
+      packages-9a07:
+        [                                            ]
+      disable-2bb4:
+        [                                            ]
+
+Compiler stats:
+  [com.etrsystems.axisight]
+     base.apk - 918
+
+HeimdAllFS state:
+  [com.etrsystems.axisight]
+    path: /data/app/~~0jTl2GHTGX9K_IFgBaAUkA==/com.etrsystems.axisight-EbyMs4khuhAtOqKsCdFWtQ==/base.apk
+    Compressed? False
+  [ Summary ]
+    # of packages: 1 / # of packages in DATA: 1 (1)
+    Compressed apks info - sum of orig size: 3008 / sum of compr size : 3008
