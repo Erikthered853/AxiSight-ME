@@ -117,15 +117,6 @@
                 app:icon="@drawable/ic_tune"
                 app:iconTint="@color/axisight_ring" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSignOut"
-                style="@style/Widget.AxiSight.Button.Text"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:contentDescription="@string/btn_sign_out_desc"
-                android:text="@string/sign_out"
-                android:textColor="@color/axisight_orbit"
-                android:textSize="11sp" />
         </LinearLayout>
 
         <!-- ═══════════════════════════════════════════
@@ -421,7 +412,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="4dp"
                     android:max="100"
-                    android:progress="50" />
+                    android:progress="65" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -435,7 +426,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
                     android:max="300"
-                    android:progress="100" />
+                    android:progress="150" />
 
                 <LinearLayout
                     android:layout_width="match_parent"

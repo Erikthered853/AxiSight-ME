@@ -58,7 +58,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var simulate = false
     private var autoDetect = true
     private var inPerPx: Double? = null
-    private var knownInches: Double = 1.0
+    private var knownInches: Double = DEFAULT_KNOWN_INCHES
 
     private val cfgRef = AtomicReference(DetectorConfig())
     private val cfg get() = cfgRef.get()
@@ -68,6 +68,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private enum class CalibrationStep { NONE, CENTER, UP, SCALE_P1, SCALE_P2 }
     private var calibrationStep = CalibrationStep.NONE
+    private var isCenterOnlyMode = false  // true = Set Center only; false = full or scale+direction wizard
     private var calCenter: Pair<Float, Float>? = null
     private var calUpPoint: Pair<Float, Float>? = null
     private var calScaleP1: Pair<Float, Float>? = null
@@ -269,7 +270,19 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
         b.switchAuto.setOnCheckedChangeListener { _, checked -> autoDetect = checked }
 
-        b.btnCal.setOnClickListener { startCalibrationWizard() }
+        b.btnCal.setOnClickListener { view ->
+            val popup = android.widget.PopupMenu(this, view)
+            popup.menu.add(0, 1, 0, getString(R.string.cal_set_center))
+            popup.menu.add(0, 2, 1, getString(R.string.cal_set_scale))
+            popup.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> startCenterCalibration()
+                    2 -> startScaleCalibration()
+                }
+                true
+            }
+            popup.show()
+        }
         b.btnCalConfirm.setOnClickListener { confirmCalibrationStep() }
         b.btnCalRetry.setOnClickListener { retryCalibrationStep() }
         b.btnCalCancel.setOnClickListener { cancelCalibrationWizard() }
@@ -321,10 +334,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         b.btnSettings.setOnClickListener {
             tuningPanelVisible = !tuningPanelVisible
             b.tuningPanel.visibility = if (tuningPanelVisible) View.VISIBLE else View.GONE
-        }
-
-        b.btnSignOut.setOnClickListener {
-            com.etrsystems.axisight.auth.AuthManager.signOut(this)
         }
 
         // Nudge buttons — move target circle center / adjust radius in view-space steps
@@ -388,7 +397,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
         b.edKnownMm.setText(getString(R.string.default_known_mm))
         b.edKnownMm.setOnEditorActionListener { v, _, _ ->
-            knownInches = v.text?.toString()?.toDoubleOrNull() ?: 1.0
+            knownInches = v.text?.toString()?.toDoubleOrNull() ?: DEFAULT_KNOWN_INCHES
             true
         }
 
@@ -433,13 +442,32 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         if (!simulate) ensureCameraPermission { startCamera() }
     }
 
-    private fun startCalibrationWizard() {
+    private fun startCenterCalibration() {
+        isCenterOnlyMode = true
         calibrationStep = CalibrationStep.CENTER
         calCenter = null
         calUpPoint = null
         calScaleP1 = null
         calScaleP2 = null
         pendingCalTap = null
+        updateCalibrationPanel()
+    }
+
+    private fun startScaleCalibration() {
+        // Require a center to be set first
+        val center = calibrationData?.let { it.centerX to it.centerY }
+            ?: calibrationStore.loadCenterOrNull()
+        if (center == null) {
+            Toast.makeText(this, getString(R.string.cal_scale_needs_center), Toast.LENGTH_LONG).show()
+            return
+        }
+        isCenterOnlyMode = false
+        calCenter = center
+        calUpPoint = null
+        calScaleP1 = null
+        calScaleP2 = null
+        pendingCalTap = null
+        calibrationStep = CalibrationStep.UP
         updateCalibrationPanel()
     }
 
@@ -459,6 +487,21 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             CalibrationStep.NONE -> Unit
             CalibrationStep.CENTER -> {
                 calCenter = tap
+                if (isCenterOnlyMode) {
+                    // Save center only — crosshairs move, scale/direction unchanged
+                    calibrationStore.saveCenter(tap.first, tap.second)
+                    b.overlay.setTrueCenter(tap.first, tap.second)
+                    val existing = calibrationData
+                    if (existing != null) {
+                        val updated = existing.copy(centerX = tap.first, centerY = tap.second)
+                        calibrationData = updated
+                        calibrationStore.save(updated)
+                        updateDeltaReadout()
+                    }
+                    cancelCalibrationWizard()
+                    Toast.makeText(this, getString(R.string.cal_center_saved), Toast.LENGTH_SHORT).show()
+                    return
+                }
                 calibrationStep = CalibrationStep.UP
             }
             CalibrationStep.UP -> {
@@ -509,6 +552,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun cancelCalibrationWizard() {
         isAutoCapturingCenter = false
         autoSamples.clear()
+        isCenterOnlyMode = false
         calibrationStep = CalibrationStep.NONE
         pendingCalTap = null
         calCenter = null
@@ -623,7 +667,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         val stepText = when (calibrationStep) {
             CalibrationStep.NONE -> ""
             CalibrationStep.CENTER -> getString(R.string.calibration_step_center)
-            CalibrationStep.UP -> getString(R.string.calibration_step_up)
+            CalibrationStep.UP -> getString(R.string.calibration_step_scale_up)
             CalibrationStep.SCALE_P1 -> getString(R.string.calibration_step_scale_1)
             CalibrationStep.SCALE_P2 -> getString(R.string.calibration_step_scale_2)
         }
@@ -654,7 +698,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
         b.txtCalQuality.text = qualityText
         b.btnCalConfirm.isEnabled = pendingCalTap != null
-        val showAutoBtn = calibrationStep == CalibrationStep.CENTER
+        val showAutoBtn = calibrationStep == CalibrationStep.CENTER && isCenterOnlyMode
         b.btnCalAutoCenter.visibility = if (showAutoBtn) View.VISIBLE else View.GONE
         if (showAutoBtn) b.btnCalAutoCenter.isEnabled = !isAutoCapturingCenter
         b.overlay.setCalibrationMarkers(
@@ -675,12 +719,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     )
 
     private fun applyLoadedCalibration() {
-        val data = calibrationData ?: return
-        inPerPx = data.inchesPerPixel
-        b.overlay.mmPerPx = inPerPx?.times(25.4)
-        b.edMmPerPx.setText(String.format(Locale.US, "%.6f", data.inchesPerPixel))
-        b.overlay.post {
-            b.overlay.setTrueCenter(data.centerX, data.centerY)
+        val data = calibrationData
+        if (data != null) {
+            inPerPx = data.inchesPerPixel
+            b.overlay.mmPerPx = inPerPx?.times(25.4)
+            b.edMmPerPx.setText(String.format(Locale.US, "%.6f", data.inchesPerPixel))
+            b.overlay.post { b.overlay.setTrueCenter(data.centerX, data.centerY) }
+        } else {
+            // Restore center-only crosshair position if user set it without full scale cal
+            val center = calibrationStore.loadCenterOrNull()
+            if (center != null) {
+                b.overlay.post { b.overlay.setTrueCenter(center.first, center.second) }
+            }
         }
         updateParamsSummary()
     }
@@ -745,21 +795,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
-    private val biometricGate by lazy {
-        com.etrsystems.axisight.auth.BiometricGate(this) {
-            com.etrsystems.axisight.auth.AuthManager.signOut(this)
-        }
-    }
-
     override fun onResume() {
         super.onResume()
-        com.etrsystems.axisight.auth.AuthManager.requireAuth(this)
-        biometricGate.onActivityResumed()
     }
 
     override fun onPause() {
         super.onPause()
-        biometricGate.onActivityPaused()
     }
 
     override fun onDestroy() {
@@ -1230,6 +1271,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         private const val MIN_UP_DISTANCE_PX = 40.0
         private const val MIN_SCALE_DISTANCE_PX = 80.0
         private const val MAX_COMBINED_ERROR_IN = 0.020
+        const val DEFAULT_KNOWN_INCHES = 0.1181  // Standard 3mm reference (0.015" bore use-case)
     }
 }
 

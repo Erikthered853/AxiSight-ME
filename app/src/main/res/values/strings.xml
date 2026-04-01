@@ -24,17 +24,22 @@
     <string name="label_mm_per_px">in/px</string>
     <string name="label_known_mm">Known in</string>
     <string name="hint_mm_per_px">e.g. 0.0010</string>
-    <string name="default_known_mm">1.000</string>
+    <string name="default_known_mm">0.1181</string>
     <string name="unset_value">unset</string>
     <string name="params_summary">target r=%1$spx  circ&gt;=%2$s  kStd %3$s  in/px %4$s</string>
     <string name="params_summary_initial">target r=0px  circ&gt;=0.50  kStd 0.50  in/px unset</string>
     <string name="delta_uncalibrated">Delta: calibrate to get inch offsets</string>
     <string name="delta_waiting_tool">Delta: waiting for tool detection</string>
     <string name="delta_value">Delta: dX=%1$.4f in  dY=%2$.4f in</string>
-    <string name="calibration_step_center">Calibration step 1/3: tap true center.</string>
+    <string name="calibration_step_center">Set Center: tap the true center reference point.</string>
     <string name="calibration_step_up">Calibration step 2/3: tap point in +Y (up) direction.</string>
-    <string name="calibration_step_scale_1">Calibration step 3/3: tap first scale point.</string>
-    <string name="calibration_step_scale_2">Calibration step 3/3: tap second scale point (known distance).</string>
+    <string name="calibration_step_scale_up">Scale Setup 1/3: tap a point in the +Y (up) direction.</string>
+    <string name="calibration_step_scale_1">Scale Setup 2/3: tap first reference point.</string>
+    <string name="calibration_step_scale_2">Scale Setup 3/3: tap second reference point (0.1181\" apart).</string>
+    <string name="cal_set_center">Set Center</string>
+    <string name="cal_set_scale">Set Scale &amp; Direction</string>
+    <string name="cal_scale_needs_center">Set center first before setting scale.</string>
+    <string name="cal_center_saved">Center saved.</string>
     <string name="calibration_complete">Calibration saved.</string>
     <string name="calibration_failed">Calibration failed. Retry wizard.</string>
     <string name="calibration_panel_title">Calibration Wizard</string>

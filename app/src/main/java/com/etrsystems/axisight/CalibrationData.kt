@@ -59,6 +59,16 @@ class CalibrationStore(context: Context) {
             .apply()
     }
 
+    fun saveCenter(x: Float, y: Float) {
+        prefs.edit().putFloat(KEY_CENTER_X, x).putFloat(KEY_CENTER_Y, y).apply()
+    }
+
+    fun loadCenterOrNull(): Pair<Float, Float>? {
+        val x = prefs.getFloat(KEY_CENTER_X, Float.NaN)
+        val y = prefs.getFloat(KEY_CENTER_Y, Float.NaN)
+        return if (x.isFinite() && y.isFinite()) x to y else null
+    }
+
     fun load(): CalibrationData? {
         val centerX = prefs.getFloat(KEY_CENTER_X, Float.NaN)
         val centerY = prefs.getFloat(KEY_CENTER_Y, Float.NaN)

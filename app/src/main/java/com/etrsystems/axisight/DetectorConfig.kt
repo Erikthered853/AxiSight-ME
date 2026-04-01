@@ -12,11 +12,11 @@ package com.etrsystems.axisight
  * @param smoothingAlpha EMA alpha for [DetectionFilter] (default: 0.35). 1.0 = no smoothing.
  */
 data class DetectorConfig(
-    val minAreaPx: Int = 200,
-    val maxAreaPx: Int = 50000,
-    val minCircularity: Double = 0.5,
-    val kStd: Double = 1.0,
-    val downscale: Int = 4,
+    val minAreaPx: Int = 20,       // Small: 0.015" bore is tiny — allow small blobs
+    val maxAreaPx: Int = 8000,     // Cap low to reject large artifacts outside bore
+    val minCircularity: Double = 0.65, // Precision bore is very circular; reject elongated noise
+    val kStd: Double = 1.5,        // Slightly tighter threshold for dark bore on bright background
+    val downscale: Int = 2,        // Less downscaling for better resolution on tiny target
     val smoothingAlpha: Float = 0.35f,
     val lockedThreshold: Int? = null,
     val targetCenterX: Float? = null,

@@ -202,10 +202,10 @@ class OverlayView @JvmOverloads constructor(
         super.onDraw(canvas)
         val w = width; val h = height
 
-        // Draw true-center crosshairs (set only on calibration completion)
-        val tcx = trueCenterX
-        val tcy = trueCenterY
-        if (tcx != null && tcy != null && w > 0 && h > 0) {
+        // Draw true-center crosshairs — calibrated position if set, otherwise screen center
+        if (w > 0 && h > 0) {
+            val tcx = trueCenterX ?: (w / 2f)
+            val tcy = trueCenterY ?: (h / 2f)
             canvas.drawLine(0f, tcy, w.toFloat(), tcy, paintCrosshair)
             canvas.drawLine(tcx, 0f, tcx, h.toFloat(), paintCrosshair)
             canvas.drawCircle(tcx, tcy, 14f, paintCrosshairCenter)
