@@ -335,14 +335,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 }
             }
         }
-        b.overlay.post {
-            val w = b.overlay.width.toFloat()
-            val h = b.overlay.height.toFloat()
-            if (w > 0f && h > 0f) {
-                b.overlay.setTargetCenter(w * 0.5f, h * 0.5f)
-                b.overlay.setTargetRadius(min(w, h) * 0.2f)
-            }
-        }
         applyLoadedCalibration()
         updateParamsSummary()
         updateDeltaReadout()
@@ -530,7 +522,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         b.overlay.mmPerPx = inPerPx?.times(25.4)
         b.edMmPerPx.setText(String.format(Locale.US, "%.6f", data.inchesPerPixel))
         calibrationStore.save(data)
-        b.overlay.setTargetCenter(data.centerX, data.centerY)
+        b.overlay.setTrueCenter(data.centerX, data.centerY)
         calibrationStep = CalibrationStep.NONE
         pendingCalTap = null
         updateCalibrationPanel()
@@ -646,7 +638,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         b.overlay.mmPerPx = inPerPx?.times(25.4)
         b.edMmPerPx.setText(String.format(Locale.US, "%.6f", data.inchesPerPixel))
         b.overlay.post {
-            b.overlay.setTargetCenter(data.centerX, data.centerY)
+            b.overlay.setTrueCenter(data.centerX, data.centerY)
         }
         updateParamsSummary()
     }
@@ -1100,6 +1092,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun isNearTargetEdge(x: Float, y: Float): Boolean {
+        if (!b.overlay.targetInitialized) return false
         val distance = hypot((x - b.overlay.targetX).toDouble(), (y - b.overlay.targetY).toDouble()).toFloat()
         return abs(distance - b.overlay.targetRadiusPx) <= targetEdgeTolerancePx
     }

@@ -40,6 +40,11 @@ class OverlayView @JvmOverloads constructor(
     var simX = 0f
     var simY = 0f
     var onTargetChanged: ((Float, Float, Float) -> Unit)? = null
+
+    // True center crosshairs — set only when calibration completes
+    private var trueCenterX: Float? = null
+    private var trueCenterY: Float? = null
+
     private var calCenter: Pair<Float, Float>? = null
     private var calUp: Pair<Float, Float>? = null
     private var calScaleP1: Pair<Float, Float>? = null
@@ -52,7 +57,8 @@ class OverlayView @JvmOverloads constructor(
         private set
     var targetRadiusPx = 160f
         private set
-    private var targetInitialized = false
+    var targetInitialized = false
+        private set
 
     private val paintTarget = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.GREEN
@@ -96,6 +102,29 @@ class OverlayView @JvmOverloads constructor(
         color = Color.WHITE
         textSize = 24f
         style = Paint.Style.FILL
+    }
+    private val paintCrosshair = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(200, 0, 220, 220)
+        strokeWidth = 2f
+        style = Paint.Style.STROKE
+        pathEffect = DashPathEffect(floatArrayOf(20f, 10f), 0f)
+    }
+    private val paintCrosshairCenter = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(230, 0, 220, 220)
+        strokeWidth = 2f
+        style = Paint.Style.STROKE
+    }
+
+    fun setTrueCenter(x: Float, y: Float) {
+        trueCenterX = x
+        trueCenterY = y
+        invalidate()
+    }
+
+    fun clearTrueCenter() {
+        trueCenterX = null
+        trueCenterY = null
+        invalidate()
     }
 
     fun clearPoints() {
@@ -141,9 +170,13 @@ class OverlayView @JvmOverloads constructor(
     }
 
     fun setTargetCenter(x: Float, y: Float) {
+        val firstDrop = !targetInitialized
         targetInitialized = true
         targetX = x.coerceIn(0f, width.toFloat().coerceAtLeast(1f))
         targetY = y.coerceIn(0f, height.toFloat().coerceAtLeast(1f))
+        if (firstDrop && width > 0 && height > 0) {
+            targetRadiusPx = minOf(width, height) * 0.15f
+        }
         notifyTargetChanged()
         invalidate()
     }
@@ -167,20 +200,23 @@ class OverlayView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        // Log.v("OverlayView", "onDraw: w=$width h=$height") // Uncomment if needed, spammy
         val w = width; val h = height
-        val cx = w / 2f; val cy = h / 2f
 
-        if (!targetInitialized && w > 0 && h > 0) {
-            targetInitialized = true
-            targetX = cx
-            targetY = cy
-            targetRadiusPx = minOf(w, h) * 0.2f
-            notifyTargetChanged()
+        // Draw true-center crosshairs (set only on calibration completion)
+        val tcx = trueCenterX
+        val tcy = trueCenterY
+        if (tcx != null && tcy != null && w > 0 && h > 0) {
+            canvas.drawLine(0f, tcy, w.toFloat(), tcy, paintCrosshair)
+            canvas.drawLine(tcx, 0f, tcx, h.toFloat(), paintCrosshair)
+            canvas.drawCircle(tcx, tcy, 14f, paintCrosshairCenter)
+            canvas.drawCircle(tcx, tcy, 3f, paintCrosshairCenter)
         }
 
-        canvas.drawCircle(targetX, targetY, targetRadiusPx, paintTarget)
-        canvas.drawCircle(targetX, targetY, 8f, paintTargetDot)
+        // Draw target circle only after user has explicitly placed it
+        if (targetInitialized) {
+            canvas.drawCircle(targetX, targetY, targetRadiusPx, paintTarget)
+            canvas.drawCircle(targetX, targetY, 8f, paintTargetDot)
+        }
 
         if (showSimDot) {
             canvas.drawCircle(simX, simY, 8f, paintSim)
