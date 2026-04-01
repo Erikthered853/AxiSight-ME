@@ -2,6 +2,13 @@
 -keep class com.example.myapp.** { *; }
 -keepclassmembers class com.example.myapp.** { *; }
 
+# Firebase Auth
+-keep class com.google.firebase.auth.** { *; }
+-keep class com.google.android.gms.auth.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+
 # Keep all activities, services, receivers, and providers
 -keep public class * extends android.app.Activity
 -keep public class * extends android.app.Service

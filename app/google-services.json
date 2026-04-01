@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "mock-project-id",
-    "storage_bucket": "mock-project-id.appspot.com"
+    "project_number": "423161174182",
+    "project_id": "axisight-me",
+    "storage_bucket": "axisight-me.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+        "mobilesdk_app_id": "1:423161174182:android:dbc0f64d0e79ff61673c67",
         "android_client_info": {
           "package_name": "com.etrsystems.axisight"
         }
@@ -15,19 +15,12 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "mock-api-key"
+          "current_key": "AIzaSyCMqNquh5lttwSh_Pe4HndhiEc4aFlmc6s"
         }
       ],
       "services": {
-        "analytics_service": {
-          "status": 1
-        },
         "appinvite_service": {
-          "status": 1
-        },
-        "ads_service": {
-          "status": 2,
-          "test_advertisers": []
+          "other_platform_oauth_client": []
         }
       }
     }

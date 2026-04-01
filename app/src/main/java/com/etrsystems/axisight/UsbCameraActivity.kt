@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
@@ -15,11 +14,13 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.view.View
+import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.etrsystems.axisight.ui.UvcFragment
+import com.etrsystems.axisight.usb.UsbDeviceUtils
 
 class UsbCameraActivity : AppCompatActivity() {
 
@@ -44,6 +45,8 @@ class UsbCameraActivity : AppCompatActivity() {
     private lateinit var statusOverlay: View
     private lateinit var statusText: TextView
     private lateinit var statusProgress: ProgressBar
+    private lateinit var btnRetry: Button
+    private lateinit var btnGoBack: Button
 
     private val usbPermissionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -139,14 +142,47 @@ class UsbCameraActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!com.etrsystems.axisight.auth.AuthManager.isSignedIn) {
+            com.etrsystems.axisight.auth.AuthManager.requireAuth(this)
+            return
+        }
         setContentView(R.layout.activity_usb_camera)
         statusOverlay = findViewById(R.id.usb_status_overlay)
         statusText = findViewById(R.id.usb_status_text)
         statusProgress = findViewById(R.id.usb_status_progress)
+        btnRetry = findViewById(R.id.btnUsbRetry)
+        btnGoBack = findViewById(R.id.btnUsbGoBack)
+
+        btnRetry.setOnClickListener {
+            hideRetryButtons()
+            openRetryCount = 0
+            startUsbFlow(force = true)
+        }
+        btnGoBack.setOnClickListener {
+            setResult(RESULT_CANCELED)
+            finish()
+        }
+
         showStatus("Connecting USB camera...")
         registerUsbMonitorRecoveryReceiverIfNeeded()
         registerUsbAttachReceiverIfNeeded()
         startUsbFlow()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!cameraOpened && !isFinishing && !isDestroyed) {
+            Log.d(TAG, "onResume: camera not open, restarting USB flow")
+            startUsbFlow()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Cancel pending work to avoid leaking when fully hidden,
+        // but do not release the camera — the user may return quickly.
+        attachDebounce?.let { mainHandler.removeCallbacks(it) }
+        attachDebounce = null
     }
 
     override fun onDestroy() {
@@ -283,16 +319,8 @@ class UsbCameraActivity : AppCompatActivity() {
 
         if (!ignoreLimit && openRetryCount >= MAX_USB_OPEN_RETRIES) {
             Log.e(TAG, "USB retries exhausted. reason=$reason")
-            showStatus("USB camera failed. Returning to main screen...", spinner = false)
-            Toast.makeText(
-                this,
-                "USB camera could not connect. Replug USB camera and try again.",
-                Toast.LENGTH_LONG
-            ).show()
-            mainHandler.postDelayed({
-                setResult(RESULT_CANCELED)
-                finish()
-            }, 1200L)
+            showStatus("USB camera could not connect.\nReplug the USB camera and tap Retry.", spinner = false)
+            showRetryButtons()
             return
         }
 
@@ -339,7 +367,18 @@ class UsbCameraActivity : AppCompatActivity() {
     }
 
     private fun hideStatus() {
+        hideRetryButtons()
         statusOverlay.visibility = View.GONE
+    }
+
+    private fun showRetryButtons() {
+        btnRetry.visibility = View.VISIBLE
+        btnGoBack.visibility = View.VISIBLE
+    }
+
+    private fun hideRetryButtons() {
+        btnRetry.visibility = View.GONE
+        btnGoBack.visibility = View.GONE
     }
 
     private fun schedulePermissionWatchdog(expectedDeviceName: String) {
@@ -432,12 +471,10 @@ class UsbCameraActivity : AppCompatActivity() {
     private fun registerUsbMonitorRecoveryReceiverIfNeeded() {
         if (usbRecoveryReceiverRegistered) return
         val filter = IntentFilter(AxisightApp.ACTION_USB_MONITOR_RACE)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(usbMonitorRecoveryReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("DEPRECATION")
-            registerReceiver(usbMonitorRecoveryReceiver, filter)
-        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            this, usbMonitorRecoveryReceiver, filter,
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         usbRecoveryReceiverRegistered = true
     }
 
@@ -478,24 +515,11 @@ class UsbCameraActivity : AppCompatActivity() {
         }
     }
 
-    private fun getUsbDeviceExtra(intent: Intent): UsbDevice? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-        }
-    }
+    private fun getUsbDeviceExtra(intent: Intent): UsbDevice? =
+        UsbDeviceUtils.getUsbDeviceExtra(intent)
 
-    private fun isUvcDevice(device: UsbDevice): Boolean {
-        if (device.deviceClass == UsbConstants.USB_CLASS_VIDEO) return true
-        for (i in 0 until device.interfaceCount) {
-            if (device.getInterface(i).interfaceClass == UsbConstants.USB_CLASS_VIDEO) {
-                return true
-            }
-        }
-        return false
-    }
+    private fun isUvcDevice(device: UsbDevice): Boolean =
+        UsbDeviceUtils.isUvcDevice(device)
 
     companion object {
         private const val TAG = "UsbCameraActivity"

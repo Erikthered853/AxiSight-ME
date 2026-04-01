@@ -43,11 +43,26 @@
     <string name="calibration_quality_pending">Quality: pending final step</string>
     <string name="calibration_quality_value">Quality: up=%1$.0fpx scale=%2$.0fpx estErr=%3$.4f in</string>
     <string name="calibration_quality_fail">Quality too low. Use longer spans for up/scale and retry.</string>
+    <string name="calibration_auto_center">Auto</string>
+    <string name="calibration_auto_collecting">Collecting… %1$d/%2$d</string>
+    <string name="calibration_auto_no_tool">No detection — point camera at the bore first.</string>
     <string name="calibration_confirm">Confirm</string>
     <string name="calibration_retry">Retry</string>
     <string name="calibration_cancel">Cancel</string>
     <string name="tuning_title">Detection Parameters</string>
+    <string name="label_nudge_target">Nudge target</string>
+    <string name="btn_nudge_up">▲</string>
+    <string name="btn_nudge_down">▼</string>
+    <string name="btn_nudge_left">◀</string>
+    <string name="btn_nudge_right">▶</string>
+    <string name="btn_radius_minus">−</string>
+    <string name="btn_radius_plus">+</string>
+    <string name="label_radius_nudge">Radius</string>
     <string name="btn_settings_desc">Toggle detection settings</string>
     <string name="cal_short">Cal</string>
     <string name="csv_short">CSV</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="btn_sign_out_desc">Sign out of AxiSight</string>
+    <!-- Replace with the Web client ID from Firebase Console > Authentication > Sign-in method > Google > Web client ID -->
+    <string name="default_web_client_id">REPLACE_WITH_FIREBASE_WEB_CLIENT_ID</string>
 </resources>

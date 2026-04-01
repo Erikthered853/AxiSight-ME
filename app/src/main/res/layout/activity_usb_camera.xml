@@ -35,6 +35,28 @@
             android:textColor="@android:color/white"
             android:textSize="16sp"
             android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUsbRetry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Retry"
+            android:visibility="gone"
+            app:backgroundTint="@color/axisight_ring"
+            xmlns:app="http://schemas.android.com/apk/res-auto" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUsbGoBack"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Go Back"
+            android:textColor="@android:color/white"
+            android:visibility="gone"
+            app:strokeColor="@android:color/white"
+            xmlns:app="http://schemas.android.com/apk/res-auto" />
     </LinearLayout>
 
 </FrameLayout>

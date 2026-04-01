@@ -2,11 +2,11 @@
 package com.etrsystems.axisight.ui
 
 import android.graphics.Bitmap
-import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -17,6 +17,7 @@ import com.etrsystems.axisight.BlobDetector
 import com.etrsystems.axisight.DetectorConfig
 import com.etrsystems.axisight.DetectionResult
 import com.etrsystems.axisight.R
+import com.etrsystems.axisight.usb.UsbDeviceUtils
 import com.jiangdg.ausbc.base.CameraFragment
 import com.jiangdg.ausbc.callback.ICameraStateCallBack
 import com.jiangdg.ausbc.camera.bean.CameraRequest
@@ -47,12 +48,28 @@ class UvcFragment : CameraFragment() {
 
     private var processingThread: HandlerThread? = null
     private var processingHandler: Handler? = null
-    private var isProcessing = false
+    @Volatile private var isProcessing = false
+
+    // frameBitmap is accessed from both main thread (recycle) and processing thread (read/write).
+    // All access must hold frameBitmapLock.
+    private val frameBitmapLock = Any()
     private var frameBitmap: Bitmap? = null
-    private val detectorConfig = DetectorConfig()
+
+    private val detectorConfigRef = java.util.concurrent.atomic.AtomicReference(DetectorConfig())
+    private val detectorConfig get() = detectorConfigRef.get()
+    private fun updateDetectorConfig(block: DetectorConfig.() -> DetectorConfig) { detectorConfigRef.set(detectorConfigRef.get().block()) }
     private var targetGlobalX: Float? = null
     private var targetGlobalY: Float? = null
     private var targetRadiusPx: Float = detectorConfig.targetRadiusPx
+    // Snapshotted on main thread when setTargetCircle() is called; read on processing thread.
+    @Volatile private var textureViewOffsetX: Float = 0f
+    @Volatile private var textureViewOffsetY: Float = 0f
+
+    // Frame-stall detection
+    @Volatile private var lastFrameTimestampMs: Long = 0L
+    @Volatile private var consecutiveNullFrames: Int = 0
+    private var stallWatchdog: Runnable? = null
+    private val mainHandler = Handler(android.os.Looper.getMainLooper())
 
     fun setDetectionCallback(cb: DetectionCallback) {
         this.callback = cb
@@ -66,6 +83,10 @@ class UvcFragment : CameraFragment() {
         targetGlobalX = x
         targetGlobalY = y
         targetRadiusPx = radiusPx
+        // Snapshot view offsets here on the main thread so applyTargetCircleToDetector()
+        // can be called from the processing thread without a data race on View properties.
+        textureViewOffsetX = textureView?.x ?: 0f
+        textureViewOffsetY = textureView?.y ?: 0f
         applyTargetCircleToDetector()
     }
 
@@ -81,35 +102,27 @@ class UvcFragment : CameraFragment() {
      * @param active If true, locks onto the center pixel of the current frame. If false, resets lock.
      * @return The locked threshold value if locked, or null.
      */
+    @androidx.annotation.MainThread
     fun lockTarget(active: Boolean): Int? {
         if (!active) {
-            detectorConfig.lockedThreshold = null
+            updateDetectorConfig { copy(lockedThreshold = null) }
             return null
         }
 
-        // Capture current center pixel
         val bmp = textureView?.bitmap ?: return null
         val w = bmp.width
         val h = bmp.height
         val result = if (w > 0 && h > 0) {
-            // Sample center 5x5 area for robust color
             val cx = w / 2
             val cy = h / 2
             val pixel = bmp.getPixel(cx, cy)
-            
-            // Convert to luminance 
             val r = (pixel shr 16) and 0xFF
             val g = (pixel shr 8) and 0xFF
             val b = pixel and 0xFF
             val lum = (r * 0.299 + g * 0.587 + b * 0.114).toInt()
-            
-            // Set threshold with a safety margin (e.g. +30 brighter allowed)
-            // But since it's a "dark dot", we want to detect pixels *darker* than this threshold.
-            // If the dot is dark (lum=50) and background is bright (lum=200),
-            // we want to catch things <= 50 + margin.
             val margin = 30
             val thr = (lum + margin).coerceIn(0, 255)
-            detectorConfig.lockedThreshold = thr
+            updateDetectorConfig { copy(lockedThreshold = thr) }
             Log.i(TAG, "Target LOCKED: centerLum=$lum, thr=$thr")
             thr
         } else {
@@ -121,10 +134,10 @@ class UvcFragment : CameraFragment() {
     }
 
     private fun recycleFrameBitmap() {
-        frameBitmap?.let {
-            if (!it.isRecycled) it.recycle()
+        synchronized(frameBitmapLock) {
+            frameBitmap?.let { if (!it.isRecycled) it.recycle() }
+            frameBitmap = null
         }
-        frameBitmap = null
     }
 
     override fun getRootView(inflater: LayoutInflater, container: ViewGroup?): View {
@@ -142,13 +155,10 @@ class UvcFragment : CameraFragment() {
         }
     }
 
-    override fun getCameraView(): IAspectRatio? {
-        return textureView
-    }
+    override fun getCameraView(): IAspectRatio? = textureView
 
-    override fun getCameraViewContainer(): ViewGroup {
-        return view as? ViewGroup ?: FrameLayout(requireContext())
-    }
+    override fun getCameraViewContainer(): ViewGroup =
+        view as? ViewGroup ?: FrameLayout(requireContext())
 
     override fun getDefaultCamera(): UsbDevice? {
         val devices = getDeviceList().orEmpty()
@@ -165,14 +175,14 @@ class UvcFragment : CameraFragment() {
             devices.firstOrNull {
                 it.vendorId == targetVendorId &&
                     it.productId == targetProductId &&
-                    isUvcDevice(it)
+                    UsbDeviceUtils.isUvcDevice(it)
             }?.let {
                 Log.i(TAG, "Using USB camera by VID/PID: ${it.vendorId}/${it.productId}")
                 return it
             }
         }
 
-        return devices.firstOrNull { isUvcDevice(it) }?.also {
+        return devices.firstOrNull { UsbDeviceUtils.isUvcDevice(it) }?.also {
             Log.w(TAG, "Falling back to first UVC device: ${it.deviceName}")
         } ?: devices.first().also {
             Log.w(TAG, "Falling back to first USB device: ${it.deviceName}")
@@ -200,7 +210,7 @@ class UvcFragment : CameraFragment() {
         when (code) {
             ICameraStateCallBack.State.OPENED -> {
                 Log.i(TAG, "Camera opened successfully")
-                activity?.runOnUiThread {
+                dispatchOnMain {
                     Toast.makeText(context, "USB Camera Connected", Toast.LENGTH_SHORT).show()
                     cameraStateListener?.onUsbCameraOpened()
                 }
@@ -208,14 +218,14 @@ class UvcFragment : CameraFragment() {
             }
             ICameraStateCallBack.State.CLOSED -> {
                 Log.i(TAG, "Camera closed")
-                activity?.runOnUiThread {
+                dispatchOnMain {
                     cameraStateListener?.onUsbCameraClosed()
                 }
                 stopProcessing()
             }
             ICameraStateCallBack.State.ERROR -> {
                 Log.e(TAG, "Camera error: $msg")
-                activity?.runOnUiThread {
+                dispatchOnMain {
                     Toast.makeText(context, "Camera Error: $msg", Toast.LENGTH_LONG).show()
                     cameraStateListener?.onUsbCameraError(msg)
                 }
@@ -232,16 +242,35 @@ class UvcFragment : CameraFragment() {
     override fun onPause() {
         stopProcessing()
         stopProcessingThread()
+        cancelStallWatchdog()
         super.onPause()
     }
 
     override fun onDestroyView() {
         stopProcessing()
         stopProcessingThread()
+        cancelStallWatchdog()
         recycleFrameBitmap()
-        cameraStateListener = null
+        // Do NOT null out cameraStateListener here — late AUSBC callbacks
+        // must still be deliverable to the activity for error recovery.
         textureView = null
         super.onDestroyView()
+    }
+
+    /**
+     * Dispatches a block on the main thread, but only if the fragment is still
+     * attached to its activity. This prevents silently dropped callbacks when
+     * the fragment is being torn down.
+     */
+    private fun dispatchOnMain(block: () -> Unit) {
+        val act = activity ?: return
+        if (!isAdded || isDetached) return
+        act.runOnUiThread {
+            // Re-check inside the post since detach can race with posting.
+            if (isAdded && !isDetached) {
+                block()
+            }
+        }
     }
 
     private fun startProcessingThread() {
@@ -253,21 +282,27 @@ class UvcFragment : CameraFragment() {
     }
 
     private fun stopProcessingThread() {
-        recycleFrameBitmap()
         processingThread?.quitSafely()
         processingThread = null
         processingHandler = null
+        // Recycle bitmap after thread has stopped to avoid the race between
+        // the processing thread using the bitmap and main thread recycling it.
+        recycleFrameBitmap()
     }
 
     private fun startProcessing() {
         if (isProcessing) return
         isProcessing = true
+        consecutiveNullFrames = 0
+        lastFrameTimestampMs = SystemClock.elapsedRealtime()
+        scheduleStallWatchdog()
         processFrame()
     }
 
     private fun stopProcessing() {
         isProcessing = false
         processingHandler?.removeCallbacksAndMessages(null)
+        cancelStallWatchdog()
     }
 
     private fun processFrame() {
@@ -275,18 +310,28 @@ class UvcFragment : CameraFragment() {
 
         processingHandler?.postDelayed({
             if (!isProcessing) return@postDelayed
-            
+
             try {
                 val bmp = obtainFrameBitmap()
                 if (bmp != null) {
+                    consecutiveNullFrames = 0
+                    lastFrameTimestampMs = SystemClock.elapsedRealtime()
                     processBitmap(bmp)
                 } else {
-                    Log.w(TAG, "TextureView bitmap unavailable - surface not ready?")
+                    consecutiveNullFrames++
+                    if (consecutiveNullFrames >= MAX_CONSECUTIVE_NULL_FRAMES) {
+                        Log.w(TAG, "Frame stream lost: $consecutiveNullFrames consecutive null frames")
+                        dispatchOnMain {
+                            cameraStateListener?.onUsbCameraError("Preview frame stream lost")
+                        }
+                        consecutiveNullFrames = 0
+                        return@postDelayed
+                    }
+                    Log.w(TAG, "TextureView bitmap unavailable ($consecutiveNullFrames/$MAX_CONSECUTIVE_NULL_FRAMES)")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Frame processing error", e)
             } finally {
-                // Schedule next frame
                 if (isProcessing) processFrame()
             }
         }, 66) // ~15 FPS
@@ -298,13 +343,15 @@ class UvcFragment : CameraFragment() {
         val h = tv.height
         if (w <= 0 || h <= 0) return null
 
-        val reusable = frameBitmap
-        if (reusable == null || reusable.isRecycled || reusable.width != w || reusable.height != h) {
-            recycleFrameBitmap()
-            frameBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        synchronized(frameBitmapLock) {
+            val reusable = frameBitmap
+            if (reusable == null || reusable.isRecycled || reusable.width != w || reusable.height != h) {
+                reusable?.let { if (!it.isRecycled) it.recycle() }
+                frameBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            }
+            val target = frameBitmap ?: return null
+            return tv.getBitmap(target)
         }
-        val target = frameBitmap ?: return null
-        return tv.getBitmap(target)
     }
 
     private fun processBitmap(bmp: Bitmap) {
@@ -314,15 +361,14 @@ class UvcFragment : CameraFragment() {
             when (result) {
                 is DetectionResult.Success -> {
                     Log.d(TAG, "Blob detected at: ${result.x}, ${result.y}")
-                    activity?.runOnUiThread {
+                    dispatchOnMain {
                         val viewX = textureView?.x ?: 0f
                         val viewY = textureView?.y ?: 0f
                         callback?.onPointDetected(result.x + viewX, result.y + viewY)
                     }
                 }
                 is DetectionResult.Failure -> {
-                    // Log failure for debugging, but reduced noise
-                     Log.d(TAG, "No blob: ${result.reason} - ${result.debugInfo}")
+                    Log.d(TAG, "No blob: ${result.reason} - ${result.debugInfo}")
                 }
             }
         } catch (e: Exception) {
@@ -330,24 +376,34 @@ class UvcFragment : CameraFragment() {
         }
     }
 
+    private fun scheduleStallWatchdog() {
+        cancelStallWatchdog()
+        val watchdog = Runnable {
+            if (!isProcessing) return@Runnable
+            val age = SystemClock.elapsedRealtime() - lastFrameTimestampMs
+            if (age >= FRAME_STALL_THRESHOLD_MS) {
+                Log.w(TAG, "Frame stall detected: last frame ${age}ms ago")
+                dispatchOnMain {
+                    cameraStateListener?.onUsbCameraError("Preview stalled (no frames for ${age}ms)")
+                }
+            } else {
+                // Re-arm if still processing and no stall yet
+                scheduleStallWatchdog()
+            }
+        }
+        stallWatchdog = watchdog
+        mainHandler.postDelayed(watchdog, FRAME_STALL_THRESHOLD_MS)
+    }
+
+    private fun cancelStallWatchdog() {
+        stallWatchdog?.let { mainHandler.removeCallbacks(it) }
+        stallWatchdog = null
+    }
+
     private fun applyTargetCircleToDetector() {
         val x = targetGlobalX ?: return
         val y = targetGlobalY ?: return
-        val viewX = textureView?.x ?: 0f
-        val viewY = textureView?.y ?: 0f
-        detectorConfig.targetCenterX = x - viewX
-        detectorConfig.targetCenterY = y - viewY
-        detectorConfig.targetRadiusPx = targetRadiusPx
-    }
-
-    private fun isUvcDevice(device: UsbDevice): Boolean {
-        if (device.deviceClass == UsbConstants.USB_CLASS_VIDEO) return true
-        for (i in 0 until device.interfaceCount) {
-            if (device.getInterface(i).interfaceClass == UsbConstants.USB_CLASS_VIDEO) {
-                return true
-            }
-        }
-        return false
+        updateDetectorConfig { copy(targetCenterX = x - textureViewOffsetX, targetCenterY = y - textureViewOffsetY, targetRadiusPx = this@UvcFragment.targetRadiusPx) }
     }
 
     companion object {
@@ -355,6 +411,8 @@ class UvcFragment : CameraFragment() {
         private const val ARG_VENDOR_ID = "vendor_id"
         private const val ARG_PRODUCT_ID = "product_id"
         private const val ARG_DEVICE_NAME = "device_name"
+        private const val MAX_CONSECUTIVE_NULL_FRAMES = 45  // ~3 seconds at 15fps
+        private const val FRAME_STALL_THRESHOLD_MS = 3000L  // 3 seconds
 
         fun newInstance(vendorId: Int, productId: Int, deviceName: String?): UvcFragment {
             return UvcFragment().apply {

@@ -5,6 +5,7 @@ import android.graphics.SurfaceTexture
 import android.util.AttributeSet
 import android.view.Surface
 import android.view.TextureView
+import androidx.annotation.WorkerThread
 import com.jiangdg.ausbc.widget.IAspectRatio
 
 /**
@@ -45,8 +46,11 @@ class SafeAspectRatioTextureView @JvmOverloads constructor(
     }
 
     override fun getSurface(): Surface {
-        val st: SurfaceTexture = surfaceTexture
-            ?: throw IllegalStateException("SurfaceTexture unavailable")
+        // surfaceTexture can be null when the view is detached or not yet laid out.
+        // Throwing here crashes the AUSBC library with no recovery path.
+        // Instead, wait up to SURFACE_WAIT_TIMEOUT_MS for the texture to become available.
+        val st: SurfaceTexture = awaitSurfaceTexture()
+            ?: throw IllegalStateException("SurfaceTexture unavailable after timeout")
 
         val w = getSurfaceWidth()
         val h = getSurfaceHeight()
@@ -61,6 +65,33 @@ class SafeAspectRatioTextureView @JvmOverloads constructor(
         return Surface(st).also { surface = it }
     }
 
+    /**
+     * Polls for a valid SurfaceTexture up to [SURFACE_WAIT_TIMEOUT_MS].
+     * This avoids crashing the AUSBC library when the surface is momentarily
+     * unavailable during layout transitions or fragment re-attach.
+     *
+     * Must NOT be called on the main thread — this method blocks.
+     * The AUSBC library calls [getSurface] from a background camera thread.
+     * [TextureView.getSurfaceTexture] is written by the framework on the main thread;
+     * the cross-thread read here is accepted as a platform implementation detail
+     * (TextureView uses volatile/atomic storage internally).
+     */
+    @WorkerThread
+    private fun awaitSurfaceTexture(): SurfaceTexture? {
+        val deadline = System.currentTimeMillis() + SURFACE_WAIT_TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            val st = surfaceTexture
+            if (st != null) return st
+            try {
+                Thread.sleep(SURFACE_POLL_INTERVAL_MS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return null
+            }
+        }
+        return null
+    }
+
     override fun postUITask(block: () -> Unit) {
         post { block.invoke() }
     }
@@ -69,6 +100,11 @@ class SafeAspectRatioTextureView @JvmOverloads constructor(
         surface?.release()
         surface = null
         super.onDetachedFromWindow()
+    }
+
+    companion object {
+        private const val SURFACE_WAIT_TIMEOUT_MS = 500L
+        private const val SURFACE_POLL_INTERVAL_MS = 20L
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

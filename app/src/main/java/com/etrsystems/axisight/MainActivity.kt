@@ -8,9 +8,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.SurfaceTexture
-import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import com.etrsystems.axisight.usb.UsbDeviceUtils
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -31,6 +31,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.rtsp.RtspMediaSource
 import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.*
 
 @UnstableApi
@@ -47,6 +49,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var usbPermissionRequestInFlight = false
     private var lastUsbPermissionRequestMs = 0L
     private val usbPermissionAction by lazy { "${BuildConfig.APPLICATION_ID}.USB_PERMISSION" }
+    // Limits automatic reconnect attempts in MainActivity USB mode to prevent infinite loops.
+    private var usbFragmentRetryCount = 0
 
     private enum class CameraSource { INTERNAL, WIFI, USB }
     private var cameraSource = CameraSource.INTERNAL
@@ -56,7 +60,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var inPerPx: Double? = null
     private var knownInches: Double = 1.0
 
-    private val cfg = DetectorConfig()
+    private val cfgRef = AtomicReference(DetectorConfig())
+    private val cfg get() = cfgRef.get()
+    private fun updateCfg(block: DetectorConfig.() -> DetectorConfig) { cfgRef.set(cfgRef.get().block()) }
+    private val coordinateMapper = CoordinateMapper()
+    private val detectionFilter = DetectionFilter()
 
     private enum class CalibrationStep { NONE, CENTER, UP, SCALE_P1, SCALE_P2 }
     private var calibrationStep = CalibrationStep.NONE
@@ -67,6 +75,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var pendingCalTap: Pair<Float, Float>? = null
     private var calibrationData: CalibrationData? = null
     private var latestToolPoint: Pair<Float, Float>? = null
+
+    // Auto-detect center: collect AUTO_SAMPLE_TARGET frames and average them
+    private val AUTO_SAMPLE_TARGET = 30
+    private val autoSamples = mutableListOf<Pair<Float, Float>>()
+    private var isAutoCapturingCenter = false
 
     private var simAngle = 0.0
     private var simRadiusPx = 200f
@@ -88,6 +101,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private var csvLogger: CsvLogger? = null
     private lateinit var calibrationStore: CalibrationStore
+    private val analysisExecutor = Executors.newSingleThreadExecutor()
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pendingUsbRetryRunnable: Runnable? = null
 
     private val camPerm = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -120,11 +136,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
             val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
             if (!granted) {
+                Log.w(TAG, "USB permission denied; scheduling retry")
                 Toast.makeText(
                     this@MainActivity,
-                    "USB permission denied. Cannot open camera.",
+                    "USB permission denied. Retrying...",
                     Toast.LENGTH_LONG
                 ).show()
+                scheduleUsbFragmentRetry("permission denied")
                 return
             }
 
@@ -189,6 +207,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         b.rgCameraSource.setOnCheckedChangeListener { _, checkedId ->
             latestToolPoint = null
+            detectionFilter.reset()
             updateDeltaReadout()
             when (checkedId) {
                 R.id.rbInternal -> {
@@ -254,6 +273,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         b.btnCalConfirm.setOnClickListener { confirmCalibrationStep() }
         b.btnCalRetry.setOnClickListener { retryCalibrationStep() }
         b.btnCalCancel.setOnClickListener { cancelCalibrationWizard() }
+        b.btnCalAutoCenter.setOnClickListener { startAutoCapturingCenter() }
         b.btnExport.setOnClickListener { csvLogger?.exportOverlay(b.overlay, inPerPx?.times(25.4)) }
         
         b.btnLock.setOnClickListener {
@@ -272,7 +292,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             } else {
                 // Unlock
                 lockRequest = false
-                cfg.lockedThreshold = null
+                updateCfg { copy(lockedThreshold = null) }
                 if (cameraSource == CameraSource.USB) {
                      val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
                      frag?.lockTarget(false)
@@ -288,6 +308,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         b.btnTrackStop.setOnClickListener {
             trackingEnabled = false
+            detectionFilter.reset()
             updateTrackingButtons()
         }
 
@@ -302,12 +323,26 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             b.tuningPanel.visibility = if (tuningPanelVisible) View.VISIBLE else View.GONE
         }
 
-        b.seekCirc.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.minCircularity = (p/100.0).coerceIn(0.0,1.0); updateParamsSummary() })
-        b.seekKstd.setOnSeekBarChangeListener(SimpleSeek { p -> cfg.kStd = p/100.0; updateParamsSummary() })
+        b.btnSignOut.setOnClickListener {
+            com.etrsystems.axisight.auth.AuthManager.signOut(this)
+        }
+
+        // Nudge buttons — move target circle center / adjust radius in view-space steps
+        val nudgeStepPx = resources.displayMetrics.density * 4f  // 4dp per tap
+        b.btnNudgeUp.setOnClickListener    { b.overlay.setTargetCenter(b.overlay.targetX, b.overlay.targetY - nudgeStepPx) }
+        b.btnNudgeDown.setOnClickListener  { b.overlay.setTargetCenter(b.overlay.targetX, b.overlay.targetY + nudgeStepPx) }
+        b.btnNudgeLeft.setOnClickListener  { b.overlay.setTargetCenter(b.overlay.targetX - nudgeStepPx, b.overlay.targetY) }
+        b.btnNudgeRight.setOnClickListener { b.overlay.setTargetCenter(b.overlay.targetX + nudgeStepPx, b.overlay.targetY) }
+        b.btnRadiusMinus.setOnClickListener { b.overlay.setTargetRadius((b.overlay.targetRadiusPx - nudgeStepPx).coerceAtLeast(4f)) }
+        b.btnRadiusPlus.setOnClickListener  { b.overlay.setTargetRadius(b.overlay.targetRadiusPx + nudgeStepPx) }
+
+        b.seekCirc.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(minCircularity = (p/100.0).coerceIn(0.0,1.0)) }; updateParamsSummary() })
+        b.seekKstd.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(kStd = p/100.0) }; updateParamsSummary() })
         b.overlay.onTargetChanged = { tx, ty, radius ->
-            cfg.targetCenterX = tx
-            cfg.targetCenterY = ty
-            cfg.targetRadiusPx = radius
+            // Convert view-space overlay coords to image-space for the detector
+            val (ix, iy) = if (coordinateMapper.isValid) coordinateMapper.viewToImage(tx, ty) else tx to ty
+            val ir = if (coordinateMapper.isValid) coordinateMapper.viewRadiusToImage(radius) else radius
+            updateCfg { copy(targetCenterX = ix, targetCenterY = iy, targetRadiusPx = ir) }
             if (!b.edTargetRadius.hasFocus()) {
                 updatingTargetRadiusField = true
                 b.edTargetRadius.setText(String.format(Locale.US, "%.1f", radius))
@@ -458,6 +493,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun retryCalibrationStep() {
         if (calibrationStep == CalibrationStep.NONE) return
+        isAutoCapturingCenter = false
+        autoSamples.clear()
         pendingCalTap = null
         when (calibrationStep) {
             CalibrationStep.CENTER -> calCenter = null
@@ -470,6 +507,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun cancelCalibrationWizard() {
+        isAutoCapturingCenter = false
+        autoSamples.clear()
         calibrationStep = CalibrationStep.NONE
         pendingCalTap = null
         calCenter = null
@@ -615,6 +654,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
         b.txtCalQuality.text = qualityText
         b.btnCalConfirm.isEnabled = pendingCalTap != null
+        val showAutoBtn = calibrationStep == CalibrationStep.CENTER
+        b.btnCalAutoCenter.visibility = if (showAutoBtn) View.VISIBLE else View.GONE
+        if (showAutoBtn) b.btnCalAutoCenter.isEnabled = !isAutoCapturingCenter
         b.overlay.setCalibrationMarkers(
             center = calCenter,
             up = calUpPoint,
@@ -646,6 +688,33 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun onToolPointDetected(x: Float, y: Float) {
         b.overlay.addPoint(x, y)
         latestToolPoint = x to y
+        if (isAutoCapturingCenter) {
+            autoSamples.add(x to y)
+            b.txtCalCapture.text = getString(R.string.calibration_auto_collecting, autoSamples.size, AUTO_SAMPLE_TARGET)
+            if (autoSamples.size >= AUTO_SAMPLE_TARGET) finishAutoCapture()
+            return
+        }
+        updateDeltaReadout()
+    }
+
+    private fun startAutoCapturingCenter() {
+        if (latestToolPoint == null) {
+            Toast.makeText(this, getString(R.string.calibration_auto_no_tool), Toast.LENGTH_SHORT).show()
+            return
+        }
+        autoSamples.clear()
+        isAutoCapturingCenter = true
+        b.btnCalAutoCenter.isEnabled = false
+        b.txtCalCapture.text = getString(R.string.calibration_auto_collecting, 0, AUTO_SAMPLE_TARGET)
+    }
+
+    private fun finishAutoCapture() {
+        isAutoCapturingCenter = false
+        val avgX = autoSamples.map { it.first }.average().toFloat()
+        val avgY = autoSamples.map { it.second }.average().toFloat()
+        autoSamples.clear()
+        pendingCalTap = avgX to avgY
+        updateCalibrationPanel()
         updateDeltaReadout()
     }
 
@@ -676,6 +745,23 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+    private val biometricGate by lazy {
+        com.etrsystems.axisight.auth.BiometricGate(this) {
+            com.etrsystems.axisight.auth.AuthManager.signOut(this)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.etrsystems.axisight.auth.AuthManager.requireAuth(this)
+        biometricGate.onActivityResumed()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        biometricGate.onActivityPaused()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         stopCamera()
@@ -684,6 +770,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         unregisterUsbPermissionReceiverIfNeeded()
         unregisterUsbMonitorRecoveryReceiverIfNeeded()
         unregisterUsbAttachReceiverIfNeeded()
+        pendingUsbRetryRunnable?.let { mainHandler.removeCallbacks(it) }
+        analysisExecutor.shutdown()
     }
 
     private fun ensureCameraPermission(onGranted: () -> Unit) {
@@ -730,36 +818,48 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also { analysis ->
-                    analysis.setAnalyzer(ContextCompat.getMainExecutor(this)) { image ->
+                    analysis.setAnalyzer(analysisExecutor) { image ->
                         try {
                             if (autoDetect && !simulate && cameraSource == CameraSource.INTERNAL) {
                                 // Manual Lock Request
                                 if (lockRequest) {
                                     lockRequest = false
                                     // Sample center pixel from ImageProxy (YUV_420_888)
-                                    // Y plane is first. Center pixel is roughly at offset:
-                                    val yPlane = image.planes[0].buffer
+                                    // Y plane is first. Use duplicate() to avoid mutating the
+                                    // shared buffer position before passing to BlobDetector.
+                                    val yPlane = image.planes[0].buffer.duplicate()
                                     val w = image.width
                                     val h = image.height
                                     val cx = w / 2
                                     val cy = h / 2
-                                    // RowStride might differ from width
                                     val rowStride = image.planes[0].rowStride
-                                    val pixelStride = image.planes[0].pixelStride // usually 1 for Y
-                                    
+                                    val pixelStride = image.planes[0].pixelStride
                                     val offset = (cy * rowStride) + (cx * pixelStride)
                                     if (offset < yPlane.remaining()) {
                                         yPlane.position(offset)
                                         val lum = yPlane.get().toInt() and 0xFF
                                         val margin = 30
-                                        cfg.lockedThreshold = (lum + margin).coerceIn(0, 255)
-                                        runOnUiThread { Toast.makeText(this@MainActivity, "Locked (Int) Thr=${cfg.lockedThreshold}", Toast.LENGTH_SHORT).show() }
+                                        val thr = (lum + margin).coerceIn(0, 255)
+                                        updateCfg { copy(lockedThreshold = thr) }
+                                        runOnUiThread {
+                                            Toast.makeText(this@MainActivity, "Locked (Int) Thr=$thr", Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 }
-                                
-                                val result = BlobDetector.detectDarkDotCenter(image, cfg)
+
+                                val snapshot = cfg
+                                val raw = BlobDetector.detectDarkDotCenter(image, snapshot)
+                                val result = detectionFilter.filter(raw)
                                 if (result is DetectionResult.Success && trackingEnabled) {
-                                    onToolPointDetected(result.x, result.y)
+                                    val previewW = b.previewView.width
+                                    val previewH = b.previewView.height
+                                    coordinateMapper.update(
+                                        image.width, image.height,
+                                        image.imageInfo.rotationDegrees,
+                                        previewW, previewH
+                                    )
+                                    val (vx, vy) = coordinateMapper.imageToView(result.x, result.y)
+                                    runOnUiThread { onToolPointDetected(vx, vy) }
                                 }
                             }
                         } catch (e: Exception) {
@@ -912,6 +1012,21 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 }
             }
         })
+        usbFragmentRetryCount = 0
+        uvcFragment.setCameraStateListener(object : com.etrsystems.axisight.ui.UvcFragment.CameraStateListener {
+            override fun onUsbCameraOpened() {
+                usbFragmentRetryCount = 0
+                Log.i(TAG, "USB camera opened in MainActivity")
+            }
+            override fun onUsbCameraClosed() {
+                Log.w(TAG, "USB camera closed in MainActivity (retry $usbFragmentRetryCount)")
+                scheduleUsbFragmentRetry("camera closed")
+            }
+            override fun onUsbCameraError(message: String?) {
+                Log.e(TAG, "USB camera error in MainActivity: $message (retry $usbFragmentRetryCount)")
+                scheduleUsbFragmentRetry("camera error: $message")
+            }
+        })
 
         supportFragmentManager.beginTransaction()
             .replace(R.id.usbCameraContainer, uvcFragment)
@@ -936,24 +1051,20 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun registerUsbPermissionReceiverIfNeeded() {
         if (usbPermissionReceiverRegistered) return
         val filter = IntentFilter(usbPermissionAction)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(usbPermissionReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("DEPRECATION")
-            registerReceiver(usbPermissionReceiver, filter)
-        }
+        ContextCompat.registerReceiver(
+            this, usbPermissionReceiver, filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         usbPermissionReceiverRegistered = true
     }
 
     private fun registerUsbMonitorRecoveryReceiverIfNeeded() {
         if (usbRecoveryReceiverRegistered) return
         val filter = IntentFilter(AxisightApp.ACTION_USB_MONITOR_RACE)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(usbMonitorRecoveryReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("DEPRECATION")
-            registerReceiver(usbMonitorRecoveryReceiver, filter)
-        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            this, usbMonitorRecoveryReceiver, filter,
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         usbRecoveryReceiverRegistered = true
     }
 
@@ -963,12 +1074,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(usbAttachReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("DEPRECATION")
-            registerReceiver(usbAttachReceiver, filter)
-        }
+        ContextCompat.registerReceiver(
+            this, usbAttachReceiver, filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         usbAttachReceiverRegistered = true
     }
 
@@ -1006,24 +1115,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
-    private fun getUsbDeviceExtra(intent: Intent): UsbDevice? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-        }
-    }
+    private fun getUsbDeviceExtra(intent: Intent): UsbDevice? =
+        UsbDeviceUtils.getUsbDeviceExtra(intent)
 
-    private fun isUvcDevice(device: UsbDevice): Boolean {
-        if (device.deviceClass == UsbConstants.USB_CLASS_VIDEO) return true
-        for (i in 0 until device.interfaceCount) {
-            if (device.getInterface(i).interfaceClass == UsbConstants.USB_CLASS_VIDEO) {
-                return true
-            }
-        }
-        return false
-    }
+    private fun isUvcDevice(device: UsbDevice): Boolean =
+        UsbDeviceUtils.isUvcDevice(device)
 
     private fun stopUsbCamera() {
         try {
@@ -1034,7 +1130,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             if (currentFrag != null) {
                  supportFragmentManager.beginTransaction()
                     .remove(currentFrag)
-                    .commit()
+                    .commitAllowingStateLoss()
             }
             if (cameraSource == CameraSource.INTERNAL) {
                  b.previewView.visibility = View.VISIBLE
@@ -1044,6 +1140,27 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+
+    private fun scheduleUsbFragmentRetry(reason: String) {
+        if (isFinishing || isDestroyed) return
+        if (cameraSource != CameraSource.USB || simulate) return
+        if (usbFragmentRetryCount >= MAX_USB_FRAGMENT_RETRIES) {
+            Log.e(TAG, "USB fragment retries exhausted in MainActivity. reason=$reason")
+            Toast.makeText(this, "USB camera could not reconnect. Replug USB camera.", Toast.LENGTH_LONG).show()
+            usbFragmentRetryCount = 0
+            return
+        }
+        usbFragmentRetryCount++
+        val delay = (USB_RECONNECT_DELAY_MS * usbFragmentRetryCount).coerceAtMost(4000L)
+        val runnable = Runnable {
+            pendingUsbRetryRunnable = null
+            if (cameraSource == CameraSource.USB && !simulate && !isFinishing && !isDestroyed) {
+                startUsbCamera()
+            }
+        }
+        pendingUsbRetryRunnable = runnable
+        mainHandler.postDelayed(runnable, delay)
+    }
 
     private val simTick = object : Runnable {
         override fun run() {
@@ -1076,9 +1193,17 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         try {
             if (cameraSource == CameraSource.WIFI && autoDetect) {
                 val bmp = b.textureView.bitmap ?: return
-                val result = BlobDetector.detectDarkDotCenter(bmp, cfg)
-                if (result is DetectionResult.Success && trackingEnabled) {
-                    onToolPointDetected(result.x, result.y)
+                try {
+                    // ExoPlayer renders to textureView without additional rotation
+                    coordinateMapper.update(bmp.width, bmp.height, 0, b.textureView.width, b.textureView.height)
+                    val raw = BlobDetector.detectDarkDotCenter(bmp, cfg)
+                    val result = detectionFilter.filter(raw)
+                    if (result is DetectionResult.Success && trackingEnabled) {
+                        val (vx, vy) = coordinateMapper.imageToView(result.x, result.y)
+                        onToolPointDetected(vx, vy)
+                    }
+                } finally {
+                    bmp.recycle()
                 }
             }
         } catch (e: Exception) {
@@ -1101,6 +1226,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         private const val TAG = "MainActivity"
         private const val USB_RECONNECT_DELAY_MS = 600L
         private const val USB_PERMISSION_RETRY_COOLDOWN_MS = 1500L
+        private const val MAX_USB_FRAGMENT_RETRIES = 6
         private const val MIN_UP_DISTANCE_PX = 40.0
         private const val MIN_SCALE_DISTANCE_PX = 80.0
         private const val MAX_COMBINED_ERROR_IN = 0.020

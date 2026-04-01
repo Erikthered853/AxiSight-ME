@@ -5,12 +5,26 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 class AxisightApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
         installUsbMonitorCrashGuard()
+        installAuthStateListener()
+    }
+
+    private fun installAuthStateListener() {
+        FirebaseAuth.getInstance().addAuthStateListener { auth ->
+            val uid = auth.currentUser?.uid
+            if (uid != null) {
+                FirebaseCrashlytics.getInstance().setUserId(uid)
+            } else {
+                FirebaseCrashlytics.getInstance().setUserId("")
+            }
+        }
     }
 
     private fun installUsbMonitorCrashGuard() {

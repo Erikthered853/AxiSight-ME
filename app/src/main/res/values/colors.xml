@@ -1,12 +1,17 @@
 <resources>
-    <color name="axisight_bg">#EAF2F7</color>
-    <color name="axisight_ring">#0F6D89</color>
-    <color name="axisight_orbit">#7AB1C8</color>
-    <color name="axisight_white">#FFFFFF</color>
-    <color name="axisight_marker">#14212A</color>
-    <color name="axisight_surface">#F7FBFD</color>
-    <color name="axisight_accent">#D7752F</color>
-    <color name="axisight_text">#132B38</color>
-    <color name="axisight_scrim">#CC0D1F2A</color>
-    <color name="axisight_bar_bg">#E6102640</color>
+    <!-- Dark Tech Palette -->
+    <color name="axisight_bg">#000000</color>
+    <color name="axisight_ring">#00FF41</color>
+    <color name="axisight_orbit">#00882B</color>
+    <color name="axisight_white">#00FF41</color>
+    <color name="axisight_marker">#000000</color>
+    <color name="axisight_surface">#080F08</color>
+    <color name="axisight_accent">#00DDFF</color>
+    <color name="axisight_text">#00FF41</color>
+    <color name="axisight_scrim">#F2000000</color>
+    <color name="axisight_bar_bg">#E8000000</color>
+    <!-- Material3 dark color roles -->
+    <color name="axisight_primary_container">#004D14</color>
+    <color name="axisight_surface_variant">#0D190D</color>
+    <color name="axisight_warn">#FF3B3B</color>
 </resources>

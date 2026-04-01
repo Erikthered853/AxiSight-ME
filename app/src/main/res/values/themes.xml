@@ -1,14 +1,54 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.AxiSight" parent="Theme.Material3.Light.NoActionBar">
+    <style name="Theme.AxiSight" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/axisight_ring</item>
-        <item name="colorOnPrimary">@color/axisight_white</item>
+        <item name="colorOnPrimary">@color/axisight_marker</item>
+        <item name="colorPrimaryContainer">@color/axisight_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/axisight_ring</item>
         <item name="colorSecondary">@color/axisight_accent</item>
-        <item name="colorOnSecondary">@color/axisight_white</item>
+        <item name="colorOnSecondary">@color/axisight_marker</item>
         <item name="colorSurface">@color/axisight_surface</item>
-        <item name="colorOnSurface">@color/axisight_text</item>
+        <item name="colorOnSurface">@color/axisight_ring</item>
+        <item name="colorSurfaceVariant">@color/axisight_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/axisight_orbit</item>
         <item name="android:windowBackground">@color/axisight_bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@color/axisight_surface</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/axisight_bg</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
+        <!-- Neon green glow shadows -->
+        <item name="android:outlineAmbientShadowColor" tools:targetApi="28">@color/axisight_ring</item>
+        <item name="android:outlineSpotShadowColor" tools:targetApi="28">@color/axisight_ring</item>
+        <!-- Global button styles -->
+        <item name="materialButtonStyle">@style/Widget.AxiSight.Button</item>
+    </style>
+
+    <!-- Filled neon button — primary actions -->
+    <style name="Widget.AxiSight.Button" parent="Widget.Material3.Button">
+        <item name="android:maxLines">1</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:elevation">8dp</item>
+        <item name="android:outlineAmbientShadowColor" tools:targetApi="28">@color/axisight_ring</item>
+        <item name="android:outlineSpotShadowColor" tools:targetApi="28">@color/axisight_ring</item>
+    </style>
+
+    <!-- Tonal neon button — secondary actions (nudge, reset, cal steps) -->
+    <style name="Widget.AxiSight.Button.Tonal" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:maxLines">1</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:elevation">6dp</item>
+        <item name="android:outlineAmbientShadowColor" tools:targetApi="28">@color/axisight_ring</item>
+        <item name="android:outlineSpotShadowColor" tools:targetApi="28">@color/axisight_ring</item>
+    </style>
+
+    <!-- Icon-only button (settings gear) -->
+    <style name="Widget.AxiSight.Button.Icon" parent="Widget.Material3.Button.IconButton">
+        <item name="android:elevation">4dp</item>
+    </style>
+
+    <!-- Text-only button (sign out) -->
+    <style name="Widget.AxiSight.Button.Text" parent="Widget.Material3.Button.TextButton">
+        <item name="android:maxLines">1</item>
+        <item name="android:textAllCaps">false</item>
     </style>
 </resources>
