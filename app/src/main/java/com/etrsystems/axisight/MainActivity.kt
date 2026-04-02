@@ -890,7 +890,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
                                 val snapshot = cfg
                                 val raw = BlobDetector.detectDarkDotCenter(image, snapshot)
-                                val result = detectionFilter.filter(raw)
+                                val result = detectionFilter.filter(raw, snapshot)
                                 if (result is DetectionResult.Success && trackingEnabled) {
                                     val previewW = b.previewView.width
                                     val previewH = b.previewView.height
@@ -1237,8 +1237,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 try {
                     // ExoPlayer renders to textureView without additional rotation
                     coordinateMapper.update(bmp.width, bmp.height, 0, b.textureView.width, b.textureView.height)
-                    val raw = BlobDetector.detectDarkDotCenter(bmp, cfg)
-                    val result = detectionFilter.filter(raw)
+                    val snapshot = cfg
+                    val raw = BlobDetector.detectDarkDotCenter(bmp, snapshot)
+                    val result = detectionFilter.filter(raw, snapshot)
                     if (result is DetectionResult.Success && trackingEnabled) {
                         val (vx, vy) = coordinateMapper.imageToView(result.x, result.y)
                         onToolPointDetected(vx, vy)
