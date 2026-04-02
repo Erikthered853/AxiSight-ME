@@ -5,7 +5,11 @@
       "Bash(JAVA_HOME=\"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\" ./gradlew assembleDebug)",
       "Bash(adb install:*)",
       "Bash(adb uninstall:*)",
-      "Bash(JAVA_HOME=\"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\" ./gradlew compileDebugKotlin)"
+      "Bash(JAVA_HOME=\"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\" ./gradlew compileDebugKotlin)",
+      "Bash(adb shell:*)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew assembleDebug)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew test)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew --no-daemon compileDebugKotlin)"
     ]
   }
 }

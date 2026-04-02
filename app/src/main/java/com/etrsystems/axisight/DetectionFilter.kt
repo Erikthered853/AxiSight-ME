@@ -23,7 +23,7 @@ import kotlin.math.*
  *
  * [reset] must be called whenever the camera source changes or tracking is stopped.
  */
-class DetectionFilter(private val alpha: Float = 0.35f) {
+class DetectionFilter {
 
     private var smoothX = 0f
     private var smoothY = 0f
@@ -33,16 +33,9 @@ class DetectionFilter(private val alpha: Float = 0.35f) {
     private var hasPublished = false
     private var hasLastGood = false
 
-    /**
-     * Filter one frame's detection result.
-     *
-     * @param result Raw result from [BlobDetector].
-     * @param cfg    Current detector config — read for [DetectorConfig.maxJumpPx],
-     *               [DetectorConfig.consecutiveFramesRequired], and
-     *               [DetectorConfig.smoothingAlpha] (alpha constructor param is the base).
-     */
+    /** Filter one frame's detection result. */
     @Synchronized
-    fun filter(result: DetectionResult, cfg: DetectorConfig = DetectorConfig()): DetectionResult {
+    fun filter(result: DetectionResult, cfg: DetectorConfig = DEFAULT_CONFIG): DetectionResult {
         if (result !is DetectionResult.Success) {
             // Any single failure resets the consecutive streak.
             // Keep lastGood so a recovering signal still gets jump-checked.
@@ -50,16 +43,17 @@ class DetectionFilter(private val alpha: Float = 0.35f) {
             return result
         }
 
-        // ── Layer 1: Jump filter ────────────────────────────────────────────────
+        // ── Layer 1: Jump filter (compare squared distances to avoid sqrt) ──────
         if (hasLastGood) {
             val dx = result.x - lastGoodX
             val dy = result.y - lastGoodY
-            val dist = sqrt(dx * dx + dy * dy)
-            if (dist > cfg.maxJumpPx) {
+            val distSq = dx * dx + dy * dy
+            val maxJumpSq = cfg.maxJumpPx * cfg.maxJumpPx
+            if (distSq > maxJumpSq) {
                 consecutiveCount = 0
                 return DetectionResult.Failure(
                     FailureReason.JUMP_TOO_LARGE,
-                    "Jump %.1fpx > %.1fpx — streak reset".format(dist, cfg.maxJumpPx)
+                    "Jump %.1fpx > %.1fpx — streak reset".format(sqrt(distSq), cfg.maxJumpPx)
                 )
             }
         }
@@ -87,21 +81,28 @@ class DetectionFilter(private val alpha: Float = 0.35f) {
 
         // Alpha scales upward with velocity so fast moves track quickly while
         // a stationary tool gets maximum smoothing.
-        val velocity = sqrt((result.x - smoothX).pow(2) + (result.y - smoothY).pow(2))
+        val dxV = result.x - smoothX
+        val dyV = result.y - smoothY
+        val velocity = hypot(dxV, dyV)
         val baseAlpha = cfg.smoothingAlpha.coerceIn(0.05f, 1f)
         val adaptAlpha = (baseAlpha + (velocity / 20f) * (1f - baseAlpha)).coerceIn(baseAlpha, 1f)
 
         val newX = adaptAlpha * result.x + (1f - adaptAlpha) * smoothX
         val newY = adaptAlpha * result.y + (1f - adaptAlpha) * smoothY
 
-        // Dead-band: skip the update if sub-pixel — prevents micro-jitter in readout.
-        val moved = sqrt((newX - smoothX).pow(2) + (newY - smoothY).pow(2))
-        if (moved > 0.3f) {
+        // Dead-band: skip the update if sub-pixel (compare squared to avoid sqrt).
+        val dxM = newX - smoothX
+        val dyM = newY - smoothY
+        if (dxM * dxM + dyM * dyM > 0.09f) {
             smoothX = newX
             smoothY = newY
         }
 
         return result.copy(x = smoothX, y = smoothY)
+    }
+
+    companion object {
+        private val DEFAULT_CONFIG = DetectorConfig()
     }
 
     @Synchronized

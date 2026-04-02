@@ -239,7 +239,7 @@ class BlobDetectorTest {
 
     @Test
     fun `DetectionFilter smooths position toward stable value`() {
-        val filter = DetectionFilter(alpha = 0.5f)
+        val filter = DetectionFilter()
         val c = filterCfg(consecutiveRequired = 1, alpha = 0.5f)
 
         val r1 = filter.filter(DetectionResult.Success(100f, 100f, 1.0), c) as DetectionResult.Success
@@ -253,7 +253,7 @@ class BlobDetectorTest {
 
     @Test
     fun `DetectionFilter reset clears smooth state`() {
-        val filter = DetectionFilter(alpha = 0.5f)
+        val filter = DetectionFilter()
         val c = filterCfg(consecutiveRequired = 1)
         filter.filter(DetectionResult.Success(50f, 50f, 1.0), c)
         filter.reset()
@@ -264,7 +264,7 @@ class BlobDetectorTest {
 
     @Test
     fun `DetectionFilter passes through Failure unchanged`() {
-        val filter = DetectionFilter(alpha = 0.5f)
+        val filter = DetectionFilter()
         val c = filterCfg()
         val failure = DetectionResult.Failure(FailureReason.NO_DARK_PIXELS, "test")
         val result = filter.filter(failure, c)
