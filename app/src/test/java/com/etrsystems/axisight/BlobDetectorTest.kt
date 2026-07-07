@@ -42,6 +42,62 @@ class BlobDetectorTest {
         return bmp
     }
 
+    /** Same as [syntheticBitmap] but with a fractional (sub-pixel) true center. */
+    private fun syntheticBitmapFractional(
+        width: Int = 200,
+        height: Int = 200,
+        cx: Double,
+        cy: Double,
+        radius: Double = 20.0,
+        dotLuminance: Int = 30,
+        bgLuminance: Int = 200
+    ): Bitmap {
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bg  = 0xFF000000.toInt() or (bgLuminance shl 16) or (bgLuminance shl 8) or bgLuminance
+        val dot = 0xFF000000.toInt() or (dotLuminance shl 16) or (dotLuminance shl 8) or dotLuminance
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                // Sample at pixel centers so the rasterized edge approximates the true
+                // analog circle boundary rather than snapping to an integer grid.
+                val dx = (x + 0.5) - cx; val dy = (y + 0.5) - cy
+                bmp.setPixel(x, y, if (dx * dx + dy * dy <= radius * radius) dot else bg)
+            }
+        }
+        return bmp
+    }
+
+    /**
+     * Dark circle with a left-to-right luminance gradient across its interior, simulating
+     * an off-axis light source. A pure weighted centroid is pulled toward the darker side;
+     * boundary-fit should stay centered since the gradient never crosses the threshold.
+     */
+    private fun syntheticGradientBitmap(
+        width: Int = 200,
+        height: Int = 200,
+        cx: Int = 100,
+        cy: Int = 100,
+        radius: Int = 30,
+        dotLumMin: Int = 10,
+        dotLumMax: Int = 80,
+        bgLuminance: Int = 220
+    ): Bitmap {
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bg = 0xFF000000.toInt() or (bgLuminance shl 16) or (bgLuminance shl 8) or bgLuminance
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val dx = x - cx; val dy = y - cy
+                if (dx * dx + dy * dy <= radius * radius) {
+                    val t = ((x - (cx - radius)).toDouble() / (2 * radius)).coerceIn(0.0, 1.0)
+                    val lum = (dotLumMin + t * (dotLumMax - dotLumMin)).toInt()
+                    bmp.setPixel(x, y, 0xFF000000.toInt() or (lum shl 16) or (lum shl 8) or lum)
+                } else {
+                    bmp.setPixel(x, y, bg)
+                }
+            }
+        }
+        return bmp
+    }
+
     private fun cfg(
         minArea: Int = 50,
         maxArea: Int = 10000,
@@ -233,6 +289,83 @@ class BlobDetectorTest {
         val c = cfg(minContrast = 0.12)
         val result = BlobDetector.detectDarkDotCenter(bmp, c)
         assertTrue("High-contrast bore should pass contrast check", result is DetectionResult.Success)
+    }
+
+    // ── Phase 6b: boundary refinement (sub-pixel) ────────────────────────────
+
+    @Test
+    fun `resolves fractional true center tightly via boundary refinement`() {
+        val trueCx = 100.35
+        val trueCy = 99.62
+        val bmp = syntheticBitmapFractional(cx = trueCx, cy = trueCy, radius = 30.0)
+        val result = BlobDetector.detectDarkDotCenter(bmp, cfg(minArea = 100, maxArea = 20000))
+        assertTrue("Expected Success, got $result", result is DetectionResult.Success)
+        val s = result as DetectionResult.Success
+        assertEquals(trueCx, s.x.toDouble(), 1.0)
+        assertEquals(trueCy, s.y.toDouble(), 1.0)
+    }
+
+    @Test
+    fun `boundary refinement resists lighting-gradient bias that would skew a weighted centroid`() {
+        val bmp = syntheticGradientBitmap(cx = 100, cy = 100, radius = 30)
+        val result = BlobDetector.detectDarkDotCenter(bmp, cfg(kStd = 1.0, minArea = 100, maxArea = 20000))
+        assertTrue("Expected Success, got $result", result is DetectionResult.Success)
+        val s = result as DetectionResult.Success
+        assertEquals(100f, s.x, 2f)
+        assertEquals(100f, s.y, 2f)
+    }
+
+    // ── Phase 6c: quality metrics on Success (circularity/contrast/sharpness) ─
+
+    /** Circle whose edge fades over [bandPx] instead of stepping abruptly, simulating blur. */
+    private fun syntheticBitmapSoftEdge(
+        width: Int = 200,
+        height: Int = 200,
+        cx: Int = 100,
+        cy: Int = 100,
+        radius: Int = 30,
+        bandPx: Double = 16.0,
+        dotLuminance: Int = 30,
+        bgLuminance: Int = 200
+    ): Bitmap {
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val dist = kotlin.math.hypot((x - cx).toDouble(), (y - cy).toDouble())
+                val t = ((dist - (radius - bandPx / 2)) / bandPx).coerceIn(0.0, 1.0)
+                val lum = (dotLuminance + t * (bgLuminance - dotLuminance)).toInt()
+                bmp.setPixel(x, y, 0xFF000000.toInt() or (lum shl 16) or (lum shl 8) or lum)
+            }
+        }
+        return bmp
+    }
+
+    @Test
+    fun `success result reports high circularity and contrast for a clean circle`() {
+        val bmp = syntheticBitmap(cx = 100, cy = 100, radius = 25, dotLuminance = 20, bgLuminance = 220)
+        val result = BlobDetector.detectDarkDotCenter(bmp, cfg(minContrast = 0.1))
+        assertTrue("Expected Success, got $result", result is DetectionResult.Success)
+        val s = result as DetectionResult.Success
+        assertTrue("circularity should be high for a clean disk, was ${s.circularity}", s.circularity > 0.9)
+        assertTrue("contrastRatio should be well above zero, was ${s.contrastRatio}", s.contrastRatio > 0.3)
+    }
+
+    @Test
+    fun `sharpness is higher for a crisp edge than a soft blurred edge`() {
+        val crisp = syntheticBitmap(cx = 100, cy = 100, radius = 30, dotLuminance = 30, bgLuminance = 200)
+        val soft = syntheticBitmapSoftEdge(cx = 100, cy = 100, radius = 30, bandPx = 16.0, dotLuminance = 30, bgLuminance = 200)
+
+        val crispResult = BlobDetector.detectDarkDotCenter(crisp, cfg(minArea = 100, maxArea = 20000))
+        val softResult = BlobDetector.detectDarkDotCenter(soft, cfg(minArea = 100, maxArea = 20000))
+        assertTrue("Expected Success for crisp edge, got $crispResult", crispResult is DetectionResult.Success)
+        assertTrue("Expected Success for soft edge, got $softResult", softResult is DetectionResult.Success)
+
+        val crispSharpness = (crispResult as DetectionResult.Success).sharpness
+        val softSharpness = (softResult as DetectionResult.Success).sharpness
+        assertTrue(
+            "Crisp edge should have higher Laplacian-variance sharpness ($crispSharpness) than soft edge ($softSharpness)",
+            crispSharpness > softSharpness
+        )
     }
 
     // ── Phase 7: DetectionFilter — EMA smoothing ─────────────────────────────

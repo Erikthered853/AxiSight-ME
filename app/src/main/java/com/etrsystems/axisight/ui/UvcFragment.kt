@@ -26,7 +26,7 @@ import com.jiangdg.ausbc.widget.IAspectRatio
 class UvcFragment : CameraFragment() {
 
     interface DetectionCallback {
-        fun onPointDetected(x: Float, y: Float)
+        fun onPointDetected(x: Float, y: Float, circularity: Double, contrastRatio: Double, sharpness: Double)
     }
 
     interface CameraStateListener {
@@ -88,6 +88,13 @@ class UvcFragment : CameraFragment() {
         textureViewOffsetX = textureView?.x ?: 0f
         textureViewOffsetY = textureView?.y ?: 0f
         applyTargetCircleToDetector()
+    }
+
+    /** Mirrors the shared detection-tuning sliders (circularity/kStd/contrast) onto this
+     *  fragment's own [detectorConfigRef], since USB frames are processed independently
+     *  of MainActivity's DetectorConfig. */
+    fun setDetectorTuning(minCircularity: Double, kStd: Double, minContrastRatio: Double) {
+        updateDetectorConfig { copy(minCircularity = minCircularity, kStd = kStd, minContrastRatio = minContrastRatio) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -364,7 +371,10 @@ class UvcFragment : CameraFragment() {
                     dispatchOnMain {
                         val viewX = textureView?.x ?: 0f
                         val viewY = textureView?.y ?: 0f
-                        callback?.onPointDetected(result.x + viewX, result.y + viewY)
+                        callback?.onPointDetected(
+                            result.x + viewX, result.y + viewY,
+                            result.circularity, result.contrastRatio, result.sharpness
+                        )
                     }
                 }
                 is DetectionResult.Failure -> {

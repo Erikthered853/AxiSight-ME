@@ -28,6 +28,10 @@ class CoordinateMapper {
 
     val isValid: Boolean get() = synchronized(lock) { _valid }
 
+    /** Scale such that view_distance = image_distance * imageToViewScale. Use to convert
+     *  per-pixel quantities (e.g. inches-per-pixel) between image space and view space. */
+    val imageToViewScale: Float get() = synchronized(lock) { scale }
+
     /**
      * @param imageWidth      Width of the raw ImageProxy / Bitmap (before rotation)
      * @param imageHeight     Height of the raw ImageProxy / Bitmap (before rotation)
@@ -98,6 +102,23 @@ class CoordinateMapper {
     /** Maps a scalar radius from view space to image space. */
     fun viewRadiusToImage(radius: Float): Float = synchronized(lock) {
         if (scale > 0) radius / scale else radius
+    }
+
+    /**
+     * Resets the mapper to its unset state (identity scale, no offset, invalid).
+     * Call when switching camera sources so a stale scale/rotation from the previous
+     * source is never applied to the new one before its first frame arrives.
+     */
+    fun invalidate() {
+        synchronized(lock) {
+            imageWidth = 1
+            imageHeight = 1
+            rotationDegrees = 0
+            scale = 1f
+            offsetX = 0f
+            offsetY = 0f
+            _valid = false
+        }
     }
 
     // Rotate image-space point to logical (display-oriented) space

@@ -63,6 +63,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private val cfgRef = AtomicReference(DetectorConfig())
     private val cfg get() = cfgRef.get()
     private fun updateCfg(block: DetectorConfig.() -> DetectorConfig) { cfgRef.set(cfgRef.get().block()) }
+
+    private data class DetectionQuality(
+        val circularity: Double,
+        val contrastRatio: Double,
+        val sharpness: Double
+    )
+    private var latestDetectionQuality: DetectionQuality? = null
     private val coordinateMapper = CoordinateMapper()
     private val detectionFilter = DetectionFilter()
 
@@ -76,14 +83,26 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var pendingCalTap: Pair<Float, Float>? = null
     private var calibrationData: CalibrationData? = null
     private var latestToolPoint: Pair<Float, Float>? = null
+    private var pendingLoadedCalibrationRestore = false
 
     // Auto-detect center: collect AUTO_SAMPLE_TARGET frames and average them
     private val AUTO_SAMPLE_TARGET = 30
     private val autoSamples = mutableListOf<Pair<Float, Float>>()
     private var isAutoCapturingCenter = false
 
+    // Rotation-based center calibration: operator rotates the spindle by hand while the
+    // detected tool position is traced, then CircleFit derives the true centerline.
+    private var isRotationMode = false
+    private var isRotationCapturing = false
+    private val rotationSamples = mutableListOf<Pair<Float, Float>>()
+    private val rotationCoverageBuckets = BooleanArray(ROTATION_COVERAGE_BUCKETS)
+    private var rotationSumX = 0.0
+    private var rotationSumY = 0.0
+    private var lastRotationFitQuality: RotationFitQuality? = null
+
     private var simAngle = 0.0
     private var simRadiusPx = 200f
+    private var zoomFactor = 1f
 
     private var isResizingTarget = false
     private var touchDownX = 0f
@@ -102,6 +121,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private var csvLogger: CsvLogger? = null
     private lateinit var calibrationStore: CalibrationStore
+    private lateinit var alignmentHistoryStore: AlignmentHistoryStore
+    private var latestDeltaInches: Pair<Double, Double>? = null
+    private var lastAlignmentToolLabel: String = ""
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var pendingUsbRetryRunnable: Runnable? = null
@@ -204,12 +226,17 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         csvLogger = CsvLogger(this)
         calibrationStore = CalibrationStore(this)
+        alignmentHistoryStore = AlignmentHistoryStore(this)
         calibrationData = calibrationStore.load()
 
         b.rgCameraSource.setOnCheckedChangeListener { _, checkedId ->
             latestToolPoint = null
+            latestDetectionQuality = null
             detectionFilter.reset()
+            coordinateMapper.invalidate()
+            applyZoom(1f)
             updateDeltaReadout()
+            updateQualityReadout()
             when (checkedId) {
                 R.id.rbInternal -> {
                     cameraSource = CameraSource.INTERNAL
@@ -243,6 +270,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         b.switchSim.setOnCheckedChangeListener { _, checked ->
             simulate = checked
+            coordinateMapper.invalidate()
             if (simulate) {
                 stopCamera()
                 stopWifiCamera()
@@ -274,10 +302,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             val popup = android.widget.PopupMenu(this, view)
             popup.menu.add(0, 1, 0, getString(R.string.cal_set_center))
             popup.menu.add(0, 2, 1, getString(R.string.cal_set_scale))
+            popup.menu.add(0, 3, 2, getString(R.string.cal_set_rotation))
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     1 -> startCenterCalibration()
                     2 -> startScaleCalibration()
+                    3 -> startRotationCalibration()
                 }
                 true
             }
@@ -287,8 +317,29 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         b.btnCalRetry.setOnClickListener { retryCalibrationStep() }
         b.btnCalCancel.setOnClickListener { cancelCalibrationWizard() }
         b.btnCalAutoCenter.setOnClickListener { startAutoCapturingCenter() }
-        b.btnExport.setOnClickListener { csvLogger?.exportOverlay(b.overlay, inPerPx?.times(25.4)) }
-        
+        b.btnCalRotationCapture.setOnClickListener {
+            if (isRotationCapturing) finishRotationCapture() else startRotationCapture()
+        }
+        b.btnExport.setOnClickListener { view ->
+            val popup = android.widget.PopupMenu(this, view)
+            popup.menu.add(0, 1, 0, getString(R.string.export_points_csv))
+            popup.menu.add(0, 2, 1, getString(R.string.log_alignment))
+            popup.menu.add(0, 3, 2, getString(R.string.export_alignment_history))
+            popup.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> csvLogger?.exportOverlay(b.overlay, inPerPx?.times(25.4))
+                    2 -> logCurrentAlignment()
+                    3 -> exportAlignmentHistory()
+                }
+                true
+            }
+            popup.show()
+        }
+
+        b.btnZoom1x.setOnClickListener { applyZoom(1f) }
+        b.btnZoom2x.setOnClickListener { applyZoom(2f) }
+        b.btnZoom5x.setOnClickListener { applyZoom(5f) }
+
         b.btnLock.setOnClickListener {
             isLocked = !isLocked
             b.btnLock.text = if (isLocked) getString(R.string.unlock) else getString(R.string.lock)
@@ -345,8 +396,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         b.btnRadiusMinus.setOnClickListener { b.overlay.setTargetRadius((b.overlay.targetRadiusPx - nudgeStepPx).coerceAtLeast(4f)) }
         b.btnRadiusPlus.setOnClickListener  { b.overlay.setTargetRadius(b.overlay.targetRadiusPx + nudgeStepPx) }
 
-        b.seekCirc.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(minCircularity = (p/100.0).coerceIn(0.0,1.0)) }; updateParamsSummary() })
-        b.seekKstd.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(kStd = p/100.0) }; updateParamsSummary() })
+        b.seekCirc.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(minCircularity = (p/100.0).coerceIn(0.0,1.0)) }; updateParamsSummary(); syncUsbDetectorTuning() })
+        b.seekKstd.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(kStd = p/100.0) }; updateParamsSummary(); syncUsbDetectorTuning() })
+        b.seekContrast.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(minContrastRatio = (p/100.0).coerceIn(0.0,1.0)) }; updateParamsSummary(); syncUsbDetectorTuning() })
         b.overlay.onTargetChanged = { tx, ty, radius ->
             // Convert view-space overlay coords to image-space for the detector
             val (ix, iy) = if (coordinateMapper.isValid) coordinateMapper.viewToImage(tx, ty) else tx to ty
@@ -385,11 +437,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         updateCalibrationPanel()
 
         b.edMmPerPx.setOnEditorActionListener { v, _, _ ->
+            // The field shows/accepts inches-per-VIEW-pixel (what the operator sees on
+            // screen); convert to image-space before storing, since CalibrationData is
+            // persisted in image space so it survives resolution/orientation changes.
             inPerPx = v.text?.toString()?.trim()?.toDoubleOrNull()
             b.overlay.mmPerPx = inPerPx?.times(25.4)
             updateParamsSummary()
             if (inPerPx != null && calibrationData != null) {
-                calibrationData = calibrationData?.copy(inchesPerPixel = inPerPx!!)
+                val imageInchesPerPixel = inPerPx!! * coordinateMapper.imageToViewScale
+                calibrationData = calibrationData?.copy(inchesPerPixel = imageInchesPerPixel)
                 calibrationData?.let { calibrationStore.save(it) }
             }
             updateDeltaReadout()
@@ -444,6 +500,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun startCenterCalibration() {
         isCenterOnlyMode = true
+        resetRotationCaptureState()
         calibrationStep = CalibrationStep.CENTER
         calCenter = null
         calUpPoint = null
@@ -462,6 +519,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             return
         }
         isCenterOnlyMode = false
+        resetRotationCaptureState()
         calCenter = center
         calUpPoint = null
         calScaleP1 = null
@@ -470,6 +528,92 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         calibrationStep = CalibrationStep.UP
         updateCalibrationPanel()
     }
+
+    private fun startRotationCalibration() {
+        isCenterOnlyMode = true
+        isRotationMode = true
+        resetRotationCaptureState()
+        calibrationStep = CalibrationStep.CENTER
+        calCenter = null
+        calUpPoint = null
+        calScaleP1 = null
+        calScaleP2 = null
+        pendingCalTap = null
+        updateCalibrationPanel()
+    }
+
+    private fun resetRotationCaptureState() {
+        isRotationMode = false
+        isRotationCapturing = false
+        rotationSamples.clear()
+        rotationCoverageBuckets.fill(false)
+        rotationSumX = 0.0
+        rotationSumY = 0.0
+        lastRotationFitQuality = null
+    }
+
+    private fun startRotationCapture() {
+        isRotationCapturing = true
+        rotationSamples.clear()
+        rotationCoverageBuckets.fill(false)
+        rotationSumX = 0.0
+        rotationSumY = 0.0
+        lastRotationFitQuality = null
+        pendingCalTap = null
+        updateCalibrationPanel()
+    }
+
+    private fun finishRotationCapture() {
+        isRotationCapturing = false
+        val quality = evaluateRotationFit(rotationSamples)
+        lastRotationFitQuality = quality
+        pendingCalTap = if (quality != null && quality.acceptable) {
+            quality.centerX to quality.centerY
+        } else {
+            Toast.makeText(this, getString(R.string.calibration_rotation_quality_fail), Toast.LENGTH_LONG).show()
+            null
+        }
+        updateCalibrationPanel()
+    }
+
+    private fun evaluateRotationFit(samples: List<Pair<Float, Float>>): RotationFitQuality? {
+        if (samples.size < MIN_ROTATION_SAMPLES) {
+            return RotationFitQuality(0f, 0f, 0.0, 0.0, samples.size, acceptable = false)
+        }
+        val fit = CircleFit.fit(samples.map { it.first.toDouble() to it.second.toDouble() })
+            ?: return RotationFitQuality(0f, 0f, 0.0, 0.0, samples.size, acceptable = false)
+        val coverage = rotationCoverageFraction(samples, fit.cx, fit.cy)
+        val acceptable = coverage >= MIN_ROTATION_COVERAGE_FRACTION && fit.rms <= MAX_ROTATION_FIT_RMS_PX
+        return RotationFitQuality(
+            centerX = fit.cx.toFloat(),
+            centerY = fit.cy.toFloat(),
+            rms = fit.rms,
+            coverageFraction = coverage,
+            sampleCount = samples.size,
+            acceptable = acceptable
+        )
+    }
+
+    private fun rotationCoverageFraction(samples: List<Pair<Float, Float>>, cx: Double, cy: Double): Double {
+        if (samples.isEmpty()) return 0.0
+        val visited = BooleanArray(ROTATION_COVERAGE_BUCKETS)
+        val bucketSizeDeg = 360.0 / ROTATION_COVERAGE_BUCKETS
+        for ((x, y) in samples) {
+            val deg = (Math.toDegrees(atan2(y - cy, x - cx)) + 360.0) % 360.0
+            val idx = (deg / bucketSizeDeg).toInt().coerceIn(0, ROTATION_COVERAGE_BUCKETS - 1)
+            visited[idx] = true
+        }
+        return visited.count { it }.toDouble() / ROTATION_COVERAGE_BUCKETS
+    }
+
+    private data class RotationFitQuality(
+        val centerX: Float,
+        val centerY: Float,
+        val rms: Double,
+        val coverageFraction: Double,
+        val sampleCount: Int,
+        val acceptable: Boolean
+    )
 
     private fun handleCalibrationTap(x: Float, y: Float): Boolean {
         if (calibrationStep == CalibrationStep.NONE) return false
@@ -488,12 +632,16 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             CalibrationStep.CENTER -> {
                 calCenter = tap
                 if (isCenterOnlyMode) {
-                    // Save center only — crosshairs move, scale/direction unchanged
-                    calibrationStore.saveCenter(tap.first, tap.second)
+                    // Save center only — crosshairs move, scale/direction unchanged.
+                    // Persist in image space (via CoordinateMapper) so calibration survives
+                    // resolution/orientation changes; the overlay crosshair still uses the
+                    // original view-space tap since it draws on screen.
+                    val (imgX, imgY) = coordinateMapper.viewToImage(tap.first, tap.second)
+                    calibrationStore.saveCenter(imgX, imgY)
                     b.overlay.setTrueCenter(tap.first, tap.second)
                     val existing = calibrationData
                     if (existing != null) {
-                        val updated = existing.copy(centerX = tap.first, centerY = tap.second)
+                        val updated = existing.copy(centerX = imgX, centerY = imgY)
                         calibrationData = updated
                         calibrationStore.save(updated)
                         updateDeltaReadout()
@@ -540,7 +688,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         autoSamples.clear()
         pendingCalTap = null
         when (calibrationStep) {
-            CalibrationStep.CENTER -> calCenter = null
+            CalibrationStep.CENTER -> {
+                calCenter = null
+                isRotationCapturing = false
+                rotationSamples.clear()
+                rotationCoverageBuckets.fill(false)
+                rotationSumX = 0.0
+                rotationSumY = 0.0
+                lastRotationFitQuality = null
+            }
             CalibrationStep.UP -> calUpPoint = null
             CalibrationStep.SCALE_P1 -> calScaleP1 = null
             CalibrationStep.SCALE_P2 -> calScaleP2 = null
@@ -553,6 +709,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         isAutoCapturingCenter = false
         autoSamples.clear()
         isCenterOnlyMode = false
+        resetRotationCaptureState()
         calibrationStep = CalibrationStep.NONE
         pendingCalTap = null
         calCenter = null
@@ -588,12 +745,25 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             return
         }
 
+        // Persist in image space (via CoordinateMapper) so calibration survives
+        // resolution/orientation changes; quality gating above stays in view-space
+        // since it's modeling tap-finger precision, which is a screen-space concept.
+        val (imgCenterX, imgCenterY) = coordinateMapper.viewToImage(center.first, center.second)
+        val (imgUpX, imgUpY) = coordinateMapper.viewToImage(upPoint.first, upPoint.second)
+        val (imgScaleP1X, imgScaleP1Y) = coordinateMapper.viewToImage(scaleP1.first, scaleP1.second)
+        val (imgScaleP2X, imgScaleP2Y) = coordinateMapper.viewToImage(scaleP2.first, scaleP2.second)
+        val imageScaleDistancePx = hypot(
+            (imgScaleP2X - imgScaleP1X).toDouble(),
+            (imgScaleP2Y - imgScaleP1Y).toDouble()
+        ).coerceAtLeast(1.0)
+        val imageInchesPerPixel = knownInches / imageScaleDistancePx
+
         val data = CalibrationData.fromCenterUpAndScale(
-            centerX = center.first,
-            centerY = center.second,
-            upPointX = upPoint.first,
-            upPointY = upPoint.second,
-            inchesPerPixel = quality.inchesPerPixel
+            centerX = imgCenterX,
+            centerY = imgCenterY,
+            upPointX = imgUpX,
+            upPointY = imgUpY,
+            inchesPerPixel = imageInchesPerPixel
         )
         if (data == null) {
             Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
@@ -601,11 +771,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         calibrationData = data
-        inPerPx = data.inchesPerPixel
+        inPerPx = quality.inchesPerPixel // view-space, for the on-screen in/px display
         b.overlay.mmPerPx = inPerPx?.times(25.4)
-        b.edMmPerPx.setText(String.format(Locale.US, "%.6f", data.inchesPerPixel))
+        b.edMmPerPx.setText(String.format(Locale.US, "%.6f", quality.inchesPerPixel))
         calibrationStore.save(data)
-        b.overlay.setTrueCenter(data.centerX, data.centerY)
+        b.overlay.setTrueCenter(center.first, center.second)
         calibrationStep = CalibrationStep.NONE
         pendingCalTap = null
         updateCalibrationPanel()
@@ -666,41 +836,69 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         val stepText = when (calibrationStep) {
             CalibrationStep.NONE -> ""
-            CalibrationStep.CENTER -> getString(R.string.calibration_step_center)
+            CalibrationStep.CENTER -> if (isRotationMode) getString(R.string.calibration_step_rotation) else getString(R.string.calibration_step_center)
             CalibrationStep.UP -> getString(R.string.calibration_step_scale_up)
             CalibrationStep.SCALE_P1 -> getString(R.string.calibration_step_scale_1)
             CalibrationStep.SCALE_P2 -> getString(R.string.calibration_step_scale_2)
         }
         b.txtCalStep.text = stepText
 
-        b.txtCalCapture.text = pendingCalTap?.let { (x, y) ->
-            getString(R.string.calibration_point_captured, x, y)
-        } ?: getString(R.string.calibration_step_wait_tap)
+        b.txtCalCapture.text = when {
+            calibrationStep == CalibrationStep.CENTER && isRotationMode && isRotationCapturing ->
+                b.txtCalCapture.text // left as-is; updated live per-frame in onToolPointDetected
+            calibrationStep == CalibrationStep.CENTER && isRotationMode && pendingCalTap != null -> {
+                val (x, y) = pendingCalTap!!
+                getString(R.string.calibration_point_captured, x, y)
+            }
+            calibrationStep == CalibrationStep.CENTER && isRotationMode -> getString(R.string.calibration_rotation_idle)
+            else -> pendingCalTap?.let { (x, y) -> getString(R.string.calibration_point_captured, x, y) }
+                ?: getString(R.string.calibration_step_wait_tap)
+        }
 
-        val qualityText = if (calibrationStep == CalibrationStep.SCALE_P2 && calCenter != null && calUpPoint != null && calScaleP1 != null && pendingCalTap != null) {
-            val typedKnownInches = b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull()
-            val useKnown = if (typedKnownInches != null && typedKnownInches > 0.0) typedKnownInches else knownInches
-            val q = evaluateCalibrationQuality(
-                center = calCenter!!,
-                upPoint = calUpPoint!!,
-                scaleP1 = calScaleP1!!,
-                scaleP2 = pendingCalTap!!,
-                knownInches = useKnown
-            )
-            getString(
-                R.string.calibration_quality_value,
-                q.upDistancePx,
-                q.scaleDistancePx,
-                q.combinedErrorIn
-            )
-        } else {
-            getString(R.string.calibration_quality_pending)
+        val qualityText = when {
+            calibrationStep == CalibrationStep.CENTER && isRotationMode && lastRotationFitQuality != null -> {
+                val q = lastRotationFitQuality!!
+                getString(
+                    R.string.calibration_rotation_quality_value,
+                    q.sampleCount,
+                    q.coverageFraction * 100.0,
+                    q.rms
+                )
+            }
+            calibrationStep == CalibrationStep.SCALE_P2 && calCenter != null && calUpPoint != null && calScaleP1 != null && pendingCalTap != null -> {
+                val typedKnownInches = b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull()
+                val useKnown = if (typedKnownInches != null && typedKnownInches > 0.0) typedKnownInches else knownInches
+                val q = evaluateCalibrationQuality(
+                    center = calCenter!!,
+                    upPoint = calUpPoint!!,
+                    scaleP1 = calScaleP1!!,
+                    scaleP2 = pendingCalTap!!,
+                    knownInches = useKnown
+                )
+                getString(
+                    R.string.calibration_quality_value,
+                    q.upDistancePx,
+                    q.scaleDistancePx,
+                    q.combinedErrorIn
+                )
+            }
+            else -> getString(R.string.calibration_quality_pending)
         }
         b.txtCalQuality.text = qualityText
-        b.btnCalConfirm.isEnabled = pendingCalTap != null
-        val showAutoBtn = calibrationStep == CalibrationStep.CENTER && isCenterOnlyMode
+        b.btnCalConfirm.isEnabled = pendingCalTap != null && (!isRotationMode || lastRotationFitQuality?.acceptable == true)
+        val showAutoBtn = calibrationStep == CalibrationStep.CENTER && isCenterOnlyMode && !isRotationMode
         b.btnCalAutoCenter.visibility = if (showAutoBtn) View.VISIBLE else View.GONE
         if (showAutoBtn) b.btnCalAutoCenter.isEnabled = !isAutoCapturingCenter
+        val showRotationBtn = calibrationStep == CalibrationStep.CENTER && isRotationMode
+        b.btnCalRotationCapture.visibility = if (showRotationBtn) View.VISIBLE else View.GONE
+        if (showRotationBtn) {
+            b.btnCalRotationCapture.isEnabled = true
+            b.btnCalRotationCapture.text = if (isRotationCapturing) {
+                getString(R.string.calibration_rotation_finish)
+            } else {
+                getString(R.string.calibration_rotation_start)
+            }
+        }
         b.overlay.setCalibrationMarkers(
             center = calCenter,
             up = calUpPoint,
@@ -719,25 +917,58 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     )
 
     private fun applyLoadedCalibration() {
+        // Stored calibration/center is in image space, but restoring the on-screen
+        // crosshair needs view space, which requires CoordinateMapper to have seen at
+        // least one frame (never true yet here in onCreate). Defer the actual restore
+        // to restoreLoadedCalibrationIfPending(), run per-frame until it applies once.
+        pendingLoadedCalibrationRestore = calibrationData != null || calibrationStore.loadCenterOrNull() != null
+        updateParamsSummary()
+    }
+
+    private fun restoreLoadedCalibrationIfPending() {
+        if (!pendingLoadedCalibrationRestore || !coordinateMapper.isValid) return
+        pendingLoadedCalibrationRestore = false
         val data = calibrationData
         if (data != null) {
-            inPerPx = data.inchesPerPixel
-            b.overlay.mmPerPx = inPerPx?.times(25.4)
-            b.edMmPerPx.setText(String.format(Locale.US, "%.6f", data.inchesPerPixel))
-            b.overlay.post { b.overlay.setTrueCenter(data.centerX, data.centerY) }
+            val viewCenter = coordinateMapper.imageToView(data.centerX, data.centerY)
+            val viewInchesPerPixel = data.inchesPerPixel / coordinateMapper.imageToViewScale
+            inPerPx = viewInchesPerPixel
+            b.overlay.mmPerPx = viewInchesPerPixel * 25.4
+            b.edMmPerPx.setText(String.format(Locale.US, "%.6f", viewInchesPerPixel))
+            b.overlay.setTrueCenter(viewCenter.first, viewCenter.second)
         } else {
             // Restore center-only crosshair position if user set it without full scale cal
             val center = calibrationStore.loadCenterOrNull()
             if (center != null) {
-                b.overlay.post { b.overlay.setTrueCenter(center.first, center.second) }
+                val viewCenter = coordinateMapper.imageToView(center.first, center.second)
+                b.overlay.setTrueCenter(viewCenter.first, viewCenter.second)
             }
         }
         updateParamsSummary()
     }
 
-    private fun onToolPointDetected(x: Float, y: Float) {
+    private fun onToolPointDetected(x: Float, y: Float, quality: DetectionQuality? = null) {
+        restoreLoadedCalibrationIfPending()
         b.overlay.addPoint(x, y)
         latestToolPoint = x to y
+        if (quality != null) latestDetectionQuality = quality
+        if (isRotationCapturing) {
+            rotationSamples.add(x to y)
+            rotationSumX += x
+            rotationSumY += y
+            if (rotationSamples.size >= 3) {
+                val meanX = rotationSumX / rotationSamples.size
+                val meanY = rotationSumY / rotationSamples.size
+                val bucketSizeDeg = 360.0 / ROTATION_COVERAGE_BUCKETS
+                val deg = (Math.toDegrees(atan2(y - meanY, x - meanX)) + 360.0) % 360.0
+                val idx = (deg / bucketSizeDeg).toInt().coerceIn(0, ROTATION_COVERAGE_BUCKETS - 1)
+                rotationCoverageBuckets[idx] = true
+            }
+            val coveragePct = (rotationCoverageBuckets.count { it }.toDouble() / ROTATION_COVERAGE_BUCKETS * 100).roundToInt()
+            b.txtCalCapture.text = getString(R.string.calibration_rotation_collecting, rotationSamples.size, coveragePct)
+            if (rotationSamples.size >= MAX_ROTATION_SAMPLES) finishRotationCapture()
+            return
+        }
         if (isAutoCapturingCenter) {
             autoSamples.add(x to y)
             b.txtCalCapture.text = getString(R.string.calibration_auto_collecting, autoSamples.size, AUTO_SAMPLE_TARGET)
@@ -745,6 +976,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             return
         }
         updateDeltaReadout()
+        updateQualityReadout()
     }
 
     private fun startAutoCapturingCenter() {
@@ -768,16 +1000,41 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         updateDeltaReadout()
     }
 
+    /**
+     * Digital zoom: scales the active preview view and the overlay together, pivoted on
+     * their shared center. Android delivers touch coordinates to a scaled view in that
+     * view's own unscaled local space, so calibration taps, target-circle dragging, and
+     * detection math all keep working unmodified regardless of zoom level.
+     */
+    private fun applyZoom(factor: Float) {
+        zoomFactor = factor
+        for (v in listOf(b.previewView, b.textureView, b.usbCameraContainer, b.overlay)) {
+            v.pivotX = v.width / 2f
+            v.pivotY = v.height / 2f
+            v.scaleX = factor
+            v.scaleY = factor
+        }
+    }
+
+    /** USB frames are detected in [com.etrsystems.axisight.ui.UvcFragment]'s own detector
+     *  config, independent of [cfg] — push tuning-slider changes there too when USB is live. */
+    private fun syncUsbDetectorTuning() {
+        val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
+        frag?.setDetectorTuning(cfg.minCircularity, cfg.kStd, cfg.minContrastRatio)
+    }
+
     private fun updateParamsSummary() {
         val inText = inPerPx?.let { String.format(Locale.US, "%.6f", it) } ?: getString(R.string.unset_value)
         val radiusText = String.format(Locale.US, "%.1f", cfg.targetRadiusPx)
         val circText = String.format(Locale.US, "%.2f", cfg.minCircularity)
         val kStdText = String.format(Locale.US, "%.2f", cfg.kStd)
+        val contrastText = String.format(Locale.US, "%.2f", cfg.minContrastRatio)
         b.txtParams.text = getString(
             R.string.params_summary,
             radiusText,
             circText,
             kStdText,
+            contrastText,
             inText
         )
     }
@@ -785,14 +1042,122 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun updateDeltaReadout() {
         val data = calibrationData
         val point = latestToolPoint
+        latestDeltaInches = null
         b.txtDelta.text = when {
             data == null -> getString(R.string.delta_uncalibrated)
             point == null -> getString(R.string.delta_waiting_tool)
             else -> {
-                val (dx, dy) = data.toolOffsetInches(point.first, point.second)
+                // calibrationData is stored in image space; convert the live view-space
+                // tool point before computing the offset.
+                val (imgX, imgY) = coordinateMapper.viewToImage(point.first, point.second)
+                val (dx, dy) = data.toolOffsetInches(imgX, imgY)
+                latestDeltaInches = dx to dy
                 getString(R.string.delta_value, dx, dy)
             }
         }
+    }
+
+    /** 0-100: how far circularity/contrast sit above their acceptance thresholds. */
+    private fun signalConfidencePercent(quality: DetectionQuality, cfg: DetectorConfig): Double {
+        val circMargin = if (cfg.minCircularity < 1.0) {
+            ((quality.circularity - cfg.minCircularity) / (1.0 - cfg.minCircularity)).coerceIn(0.0, 1.0)
+        } else 0.0
+        val contrastMargin = if (cfg.minContrastRatio < 1.0) {
+            ((quality.contrastRatio - cfg.minContrastRatio) / (1.0 - cfg.minContrastRatio)).coerceIn(0.0, 1.0)
+        } else 0.0
+        return (circMargin + contrastMargin) / 2.0 * 100.0
+    }
+
+    private fun updateQualityReadout() {
+        val quality = latestDetectionQuality
+        if (quality == null) {
+            b.txtQuality.text = getString(R.string.quality_no_signal)
+            return
+        }
+
+        val builder = android.text.SpannableStringBuilder()
+        fun appendSegment(text: String, colorRes: Int) {
+            if (builder.isNotEmpty()) builder.append("   ")
+            val start = builder.length
+            builder.append(text)
+            builder.setSpan(
+                android.text.style.ForegroundColorSpan(ContextCompat.getColor(this, colorRes)),
+                start, builder.length, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+
+        val fitRms = b.overlay.lastFitResult?.rms
+        if (fitRms != null) {
+            val fitColor = when {
+                fitRms <= FIT_RMS_GOOD_PX -> R.color.axisight_ring
+                fitRms <= FIT_RMS_OK_PX -> R.color.axisight_caution
+                else -> R.color.axisight_warn
+            }
+            appendSegment(getString(R.string.quality_fit_segment, fitRms), fitColor)
+        }
+
+        val sharpColor = when {
+            quality.sharpness >= SHARPNESS_GOOD -> R.color.axisight_ring
+            quality.sharpness >= SHARPNESS_OK -> R.color.axisight_caution
+            else -> R.color.axisight_warn
+        }
+        appendSegment(getString(R.string.quality_sharp_segment, quality.sharpness), sharpColor)
+
+        val confidencePct = signalConfidencePercent(quality, cfg)
+        val signalColor = when {
+            confidencePct >= SIGNAL_GOOD_PCT -> R.color.axisight_ring
+            confidencePct >= SIGNAL_OK_PCT -> R.color.axisight_caution
+            else -> R.color.axisight_warn
+        }
+        appendSegment(getString(R.string.quality_signal_segment, confidencePct), signalColor)
+
+        b.txtQuality.text = builder
+    }
+
+    private fun logCurrentAlignment() {
+        val delta = latestDeltaInches
+        if (delta == null) {
+            Toast.makeText(this, getString(R.string.alignment_log_no_reading), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val input = android.widget.EditText(this).apply {
+            setText(lastAlignmentToolLabel)
+            hint = getString(R.string.alignment_log_tool_hint)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.alignment_log_title))
+            .setView(input)
+            .setPositiveButton(getString(R.string.alignment_log_save)) { _, _ ->
+                val label = input.text?.toString()?.trim()
+                    .takeUnless { it.isNullOrEmpty() } ?: getString(R.string.alignment_log_default_tool)
+                lastAlignmentToolLabel = label
+                alignmentHistoryStore.append(
+                    AlignmentRecord(
+                        timestampMs = System.currentTimeMillis(),
+                        toolLabel = label,
+                        cameraSource = cameraSource.name,
+                        dxIn = delta.first,
+                        dyIn = delta.second,
+                        fitRmsPx = b.overlay.lastFitResult?.rms
+                    )
+                )
+                Toast.makeText(this, getString(R.string.alignment_log_saved, label), Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun exportAlignmentHistory() {
+        val records = alignmentHistoryStore.readAll()
+        if (records.isEmpty()) {
+            Toast.makeText(this, getString(R.string.alignment_log_empty), Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(
+            this,
+            getString(R.string.alignment_log_export_path, records.size, alignmentHistoryStore.exportPath()),
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     override fun onResume() {
@@ -900,7 +1265,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                                         previewW, previewH
                                     )
                                     val (vx, vy) = coordinateMapper.imageToView(result.x, result.y)
-                                    runOnUiThread { onToolPointDetected(vx, vy) }
+                                    val quality = DetectionQuality(result.circularity, result.contrastRatio, result.sharpness)
+                                    runOnUiThread { onToolPointDetected(vx, vy, quality) }
                                 }
                             }
                         } catch (e: Exception) {
@@ -1046,10 +1412,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             y = b.overlay.targetY,
             radiusPx = b.overlay.targetRadiusPx
         )
+        uvcFragment.setDetectorTuning(cfg.minCircularity, cfg.kStd, cfg.minContrastRatio)
         uvcFragment.setDetectionCallback(object : com.etrsystems.axisight.ui.UvcFragment.DetectionCallback {
-            override fun onPointDetected(x: Float, y: Float) {
+            override fun onPointDetected(x: Float, y: Float, circularity: Double, contrastRatio: Double, sharpness: Double) {
                 if (autoDetect && !simulate && trackingEnabled) {
-                    onToolPointDetected(x, y)
+                    onToolPointDetected(x, y, DetectionQuality(circularity, contrastRatio, sharpness))
                 }
             }
         })
@@ -1187,8 +1554,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         if (cameraSource != CameraSource.USB || simulate) return
         if (usbFragmentRetryCount >= MAX_USB_FRAGMENT_RETRIES) {
             Log.e(TAG, "USB fragment retries exhausted in MainActivity. reason=$reason")
-            Toast.makeText(this, "USB camera could not reconnect. Replug USB camera.", Toast.LENGTH_LONG).show()
             usbFragmentRetryCount = 0
+            com.google.android.material.snackbar.Snackbar.make(
+                b.root,
+                "USB camera could not reconnect. Replug it, or tap Retry.",
+                com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE
+            ).setAction("Retry") {
+                if (cameraSource == CameraSource.USB && !simulate) startUsbCamera()
+            }.show()
             return
         }
         usbFragmentRetryCount++
@@ -1214,7 +1587,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             val x = cx + simRadiusPx * cos(simAngle).toFloat()
             val y = cy + simRadiusPx * sin(simAngle).toFloat()
             b.overlay.setSimDot(x, y)
-            if (autoDetect && trackingEnabled) onToolPointDetected(x, y)
+            if (autoDetect && trackingEnabled) {
+                // Simulated points have no real camera image behind them, so image space
+                // and view space are the same fictional space: feed an identity mapping.
+                coordinateMapper.update(w, h, 0, w, h)
+                onToolPointDetected(x, y)
+            }
             b.previewView.postDelayed(this, 16L)
         }
     }
@@ -1242,7 +1620,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     val result = detectionFilter.filter(raw, snapshot)
                     if (result is DetectionResult.Success && trackingEnabled) {
                         val (vx, vy) = coordinateMapper.imageToView(result.x, result.y)
-                        onToolPointDetected(vx, vy)
+                        val quality = DetectionQuality(result.circularity, result.contrastRatio, result.sharpness)
+                        onToolPointDetected(vx, vy, quality)
                     }
                 } finally {
                     bmp.recycle()
@@ -1273,6 +1652,20 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         private const val MIN_SCALE_DISTANCE_PX = 80.0
         private const val MAX_COMBINED_ERROR_IN = 0.020
         const val DEFAULT_KNOWN_INCHES = 0.1181  // Standard 3mm reference (0.015" bore use-case)
+        private const val ROTATION_COVERAGE_BUCKETS = 24
+        private const val MIN_ROTATION_SAMPLES = 40
+        private const val MAX_ROTATION_SAMPLES = 600
+        private const val MIN_ROTATION_COVERAGE_FRACTION = 0.75 // ~270 degrees of the trace
+        private const val MAX_ROTATION_FIT_RMS_PX = 3.0
+
+        // Quality-readout tiers (green/yellow/red). Starting points, not empirically
+        // tuned against real hardware yet — adjust once field data is available.
+        private const val FIT_RMS_GOOD_PX = 1.5
+        private const val FIT_RMS_OK_PX = 3.0
+        private const val SHARPNESS_GOOD = 150.0
+        private const val SHARPNESS_OK = 50.0
+        private const val SIGNAL_GOOD_PCT = 70.0
+        private const val SIGNAL_OK_PCT = 40.0
     }
 }
 

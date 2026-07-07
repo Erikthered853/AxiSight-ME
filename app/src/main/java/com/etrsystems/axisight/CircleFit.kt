@@ -9,8 +9,9 @@ import kotlin.math.abs
  * Used by [OverlayView] to draw a best-fit circle through collected tracking points,
  * giving the operator a visual indication of runout radius and fit quality (RMS error).
  *
- * TODO: Consider using this for sub-pixel tool-center refinement in BlobDetector
- *       by fitting to the boundary pixels of the detected blob.
+ * Also used by [BlobDetector] for sub-pixel boundary refinement: fitting a circle to
+ * the blob's edge-crossing points is less biased by lighting gradients than a
+ * weighted centroid.
  */
 object CircleFit {
     data class Result(val cx: Double, val cy: Double, val r: Double, val rms: Double)

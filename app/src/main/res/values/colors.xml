@@ -14,4 +14,5 @@
     <color name="axisight_primary_container">#004D14</color>
     <color name="axisight_surface_variant">#0D190D</color>
     <color name="axisight_warn">#FF3B3B</color>
+    <color name="axisight_caution">#FFC400</color>
 </resources>

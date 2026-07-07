@@ -36,6 +36,10 @@ class OverlayView @JvmOverloads constructor(
     var maxPoints = 240
     var mmPerPx: Double? = null
 
+    /** Circle fit over the current point trace, refreshed on every [addPoint] call. */
+    var lastFitResult: CircleFit.Result? = null
+        private set
+
     var showSimDot = false
     var simX = 0f
     var simY = 0f
@@ -131,14 +135,19 @@ class OverlayView @JvmOverloads constructor(
         synchronized(ptsLock) {
             pts.clear()
         }
+        lastFitResult = null
         invalidate()
     }
 
     fun addPoint(px: Float, py: Float) {
-        synchronized(ptsLock) {
+        val snapshot = synchronized(ptsLock) {
             if (pts.size >= maxPoints) pts.removeFirst()
             pts.addLast(px to py)
+            pts.toList()
         }
+        lastFitResult = if (snapshot.size >= 3) {
+            CircleFit.fit(snapshot.map { it.first.toDouble() to it.second.toDouble() })
+        } else null
         invalidate()
     }
 
@@ -228,23 +237,20 @@ class OverlayView @JvmOverloads constructor(
             for ((x, y) in pts) {
                 canvas.drawCircle(x, y, 4f, paintPts)
             }
+        }
 
-            if (pts.size >= 3) {
-                val dpts = pts.map { it.first.toDouble() to it.second.toDouble() }
-                val res = CircleFit.fit(dpts)
-                if (res != null) {
-                    val ccx = res.cx.toFloat(); val ccy = res.cy.toFloat()
-                    val rr = res.r.toFloat()
-                    canvas.drawCircle(ccx, ccy, rr, paintFit)
-                    canvas.drawCircle(ccx, ccy, 5f, paintFit)
-                    val mm = mmPerPx
-                    val text = if (mm != null)
-                        "r=%.1fpx(%.3fmm)  rms=%.2fpx(%.3fmm)".format(rr, rr*mm, res.rms, res.rms*mm)
-                    else
-                        "r=%.1fpx  rms=%.2fpx".format(rr, res.rms)
-                    canvas.drawText(text, 20f, h - 24f, paintText)
-                }
-            }
+        val res = lastFitResult
+        if (res != null) {
+            val ccx = res.cx.toFloat(); val ccy = res.cy.toFloat()
+            val rr = res.r.toFloat()
+            canvas.drawCircle(ccx, ccy, rr, paintFit)
+            canvas.drawCircle(ccx, ccy, 5f, paintFit)
+            val mm = mmPerPx
+            val text = if (mm != null)
+                "r=%.1fpx(%.3fmm)  rms=%.2fpx(%.3fmm)".format(rr, rr*mm, res.rms, res.rms*mm)
+            else
+                "r=%.1fpx  rms=%.2fpx".format(rr, res.rms)
+            canvas.drawText(text, 20f, h - 24f, paintText)
         }
     }
 

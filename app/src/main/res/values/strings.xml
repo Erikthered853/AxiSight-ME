@@ -21,16 +21,24 @@
     <string name="hint_target_radius">e.g. 120</string>
     <string name="label_circularity">Minimum Circularity</string>
     <string name="label_kstd">Noise Rejection (kStd)</string>
+    <string name="label_contrast">Contrast Sensitivity</string>
     <string name="label_mm_per_px">in/px</string>
     <string name="label_known_mm">Known in</string>
     <string name="hint_mm_per_px">e.g. 0.0010</string>
     <string name="default_known_mm">0.1181</string>
     <string name="unset_value">unset</string>
-    <string name="params_summary">target r=%1$spx  circ&gt;=%2$s  kStd %3$s  in/px %4$s</string>
-    <string name="params_summary_initial">target r=0px  circ&gt;=0.50  kStd 0.50  in/px unset</string>
+    <string name="params_summary">target r=%1$spx  circ&gt;=%2$s  kStd %3$s  contrast&gt;=%4$s  in/px %5$s</string>
+    <string name="params_summary_initial">target r=0px  circ&gt;=0.50  kStd 0.50  contrast&gt;=0.12  in/px unset</string>
     <string name="delta_uncalibrated">Delta: calibrate to get inch offsets</string>
     <string name="delta_waiting_tool">Delta: waiting for tool detection</string>
     <string name="delta_value">Delta: dX=%1$.4f in  dY=%2$.4f in</string>
+    <string name="quality_no_signal">Quality: no detection</string>
+    <string name="zoom_1x">1x</string>
+    <string name="zoom_2x">2x</string>
+    <string name="zoom_5x">5x</string>
+    <string name="quality_fit_segment">Fit %1$.2fpx</string>
+    <string name="quality_sharp_segment">Sharp %1$.0f</string>
+    <string name="quality_signal_segment">Signal %1$.0f%%</string>
     <string name="calibration_step_center">Set Center: tap the true center reference point.</string>
     <string name="calibration_step_up">Calibration step 2/3: tap point in +Y (up) direction.</string>
     <string name="calibration_step_scale_up">Scale Setup 1/3: tap a point in the +Y (up) direction.</string>
@@ -38,6 +46,7 @@
     <string name="calibration_step_scale_2">Scale Setup 3/3: tap second reference point (0.1181\" apart).</string>
     <string name="cal_set_center">Set Center</string>
     <string name="cal_set_scale">Set Scale &amp; Direction</string>
+    <string name="cal_set_rotation">Find Center by Rotation</string>
     <string name="cal_scale_needs_center">Set center first before setting scale.</string>
     <string name="cal_center_saved">Center saved.</string>
     <string name="calibration_complete">Calibration saved.</string>
@@ -51,6 +60,13 @@
     <string name="calibration_auto_center">Auto</string>
     <string name="calibration_auto_collecting">Collecting… %1$d/%2$d</string>
     <string name="calibration_auto_no_tool">No detection — point camera at the bore first.</string>
+    <string name="calibration_step_rotation">Rotate the spindle by hand through a full turn while capturing, then finish.</string>
+    <string name="calibration_rotation_idle">Ready — press Start Rotation Capture, then rotate the spindle by hand.</string>
+    <string name="calibration_rotation_start">Start Rotation Capture</string>
+    <string name="calibration_rotation_finish">Finish Rotation Capture</string>
+    <string name="calibration_rotation_collecting">Rotating… %1$d samples, %2$d%% coverage</string>
+    <string name="calibration_rotation_quality_value">Fit: %1$d pts, %2$.0f%% coverage, rms=%3$.2fpx</string>
+    <string name="calibration_rotation_quality_fail">Trace too short or noisy — rotate further/steadier and retry.</string>
     <string name="calibration_confirm">Confirm</string>
     <string name="calibration_retry">Retry</string>
     <string name="calibration_cancel">Cancel</string>
@@ -66,6 +82,17 @@
     <string name="btn_settings_desc">Toggle detection settings</string>
     <string name="cal_short">Cal</string>
     <string name="csv_short">CSV</string>
+    <string name="export_points_csv">Export Points CSV</string>
+    <string name="log_alignment">Log Alignment</string>
+    <string name="export_alignment_history">Export Alignment History</string>
+    <string name="alignment_log_title">Log Alignment</string>
+    <string name="alignment_log_tool_hint">Tool / machine label</string>
+    <string name="alignment_log_default_tool">Unlabeled</string>
+    <string name="alignment_log_save">Save</string>
+    <string name="alignment_log_no_reading">No current dX/dY reading to log — calibrate and detect the tool first.</string>
+    <string name="alignment_log_saved">Logged alignment for \"%1$s\".</string>
+    <string name="alignment_log_empty">No alignment history yet.</string>
+    <string name="alignment_log_export_path">%1$d records in %2$s</string>
     <string name="sign_out">Sign Out</string>
     <string name="btn_sign_out_desc">Sign out of AxiSight</string>
     <!-- Replace with the Web client ID from Firebase Console > Authentication > Sign-in method > Google > Web client ID -->

@@ -5,7 +5,21 @@ import androidx.camera.core.ImageProxy
 import kotlin.math.*
 
 sealed class DetectionResult {
-    data class Success(val x: Float, val y: Float, val area: Double) : DetectionResult()
+    /**
+     * @param circularity   Eigenvalue-ratio circularity in [0,1] (see Pass 3), defaults to a
+     *                       benign 1.0 for callers (mainly tests) that don't care about it.
+     * @param contrastRatio Bore-vs-background contrast ratio (see Pass 2), defaults to 1.0.
+     * @param sharpness     Variance of the discrete Laplacian over the ROI — a focus/motion-blur
+     *                       proxy (higher = sharper edges present), defaults to 0.0.
+     */
+    data class Success(
+        val x: Float,
+        val y: Float,
+        val area: Double,
+        val circularity: Double = 1.0,
+        val contrastRatio: Double = 1.0,
+        val sharpness: Double = 0.0
+    ) : DetectionResult()
     data class Failure(val reason: FailureReason, val debugInfo: String) : DetectionResult()
 }
 
@@ -23,16 +37,20 @@ enum class FailureReason {
 /**
  * Detects the center of the darkest circular blob in an image.
  *
- * Algorithm (3 passes over the downscaled target region):
+ * Algorithm (over the downscaled target region):
  *   Pass 1 — luminance histogram + mean/σ → adaptive threshold = mean − kStd×σ
  *   Pass 2 — collect dark pixels (lum ≤ threshold) → WEIGHTED centroid
  *             Weight = (threshold − lum + 1): darker pixels pull the center harder.
  *             Also checks contrast ratio: the dark blob must be meaningfully darker
  *             than the region background before the result is accepted.
  *   Pass 3 — weighted 2nd-moment matrix → circularity via eigenvalue ratio
+ *   Pass 4 — boundary refinement: casts rays out from the centroid, finds the
+ *             sub-pixel threshold crossing on each, and fits a circle ([CircleFit])
+ *             to those edge points. The weighted centroid is biased by lighting
+ *             gradients across the blob; fitting the boundary instead is not, so
+ *             this pass is used as the final center when it converges cleanly.
  *
- * No per-frame heap allocation. [detectCore] is shared by both the
- * [ImageProxy] (YUV) and [Bitmap] (ARGB) overloads.
+ * [detectCore] is shared by both the [ImageProxy] (YUV) and [Bitmap] (ARGB) overloads.
  */
 object BlobDetector {
 
@@ -53,6 +71,73 @@ object BlobDetector {
         return (r * 0.299 + g * 0.587 + b * 0.114).toInt()
     }
 
+    /** Bilinearly samples the downscaled grid at fractional coordinates, clamping at the edges. */
+    private fun sampleBilinear(fi: Double, fj: Double, dw: Int, dh: Int, getPixel: (Int, Int) -> Int): Double {
+        val i0 = floor(fi).toInt()
+        val j0 = floor(fj).toInt()
+        val tx = fi - i0
+        val ty = fj - j0
+        val ci0 = i0.coerceIn(0, dw - 1); val ci1 = (i0 + 1).coerceIn(0, dw - 1)
+        val cj0 = j0.coerceIn(0, dh - 1); val cj1 = (j0 + 1).coerceIn(0, dh - 1)
+        val v00 = getPixel(ci0, cj0).toDouble()
+        val v10 = getPixel(ci1, cj0).toDouble()
+        val v01 = getPixel(ci0, cj1).toDouble()
+        val v11 = getPixel(ci1, cj1).toDouble()
+        val vTop = v00 + (v10 - v00) * tx
+        val vBot = v01 + (v11 - v01) * tx
+        return vTop + (vBot - vTop) * ty
+    }
+
+    /**
+     * Refines [cxD],[cyD] by casting rays outward, locating the sub-pixel dark→light
+     * threshold crossing on each, and fitting a circle to the crossing points.
+     * Returns null if fewer than half the rays find a clean crossing (e.g. an
+     * occluded or clipped blob), leaving the caller to fall back to the centroid.
+     */
+    private fun refineBoundary(
+        cxD: Double,
+        cyD: Double,
+        estRadiusD: Double,
+        thr: Int,
+        dw: Int,
+        dh: Int,
+        getPixel: (Int, Int) -> Int
+    ): CircleFit.Result? {
+        if (estRadiusD < 1.0) return null
+        val rayCount = 24
+        val stepD = 0.5
+        val searchStart = (estRadiusD * 0.5).coerceAtLeast(1.0)
+        val searchEnd = estRadiusD * 1.6
+
+        val edgePoints = ArrayList<Pair<Double, Double>>(rayCount)
+        for (k in 0 until rayCount) {
+            val angle = 2.0 * PI * k / rayCount
+            val ca = cos(angle)
+            val sa = sin(angle)
+            var prevR = searchStart
+            var prevLum = sampleBilinear(cxD + ca * prevR, cyD + sa * prevR, dw, dh, getPixel)
+            var r = searchStart + stepD
+            while (r <= searchEnd) {
+                val lum = sampleBilinear(cxD + ca * r, cyD + sa * r, dw, dh, getPixel)
+                if (prevLum <= thr && lum > thr) {
+                    val frac = ((thr - prevLum) / (lum - prevLum)).coerceIn(0.0, 1.0)
+                    val edgeR = prevR + frac * (r - prevR)
+                    edgePoints.add((cxD + ca * edgeR) to (cyD + sa * edgeR))
+                    break
+                }
+                prevR = r
+                prevLum = lum
+                r += stepD
+            }
+        }
+        if (edgePoints.size < rayCount / 2) return null
+
+        val fit = CircleFit.fit(edgePoints) ?: return null
+        val driftD = hypot(fit.cx - cxD, fit.cy - cyD)
+        if (driftD > estRadiusD * 0.5) return null // fit dragged too far from centroid, distrust it
+        return fit
+    }
+
     /**
      * Core detection algorithm operating on a downscaled grid.
      *
@@ -71,10 +156,16 @@ object BlobDetector {
         getPixel: (i: Int, j: Int) -> Int
     ): DetectionResult {
 
-        // ── Pass 1: histogram + mean/σ for adaptive threshold ──────────────────
+        // ── Pass 1: histogram + mean/σ for adaptive threshold, + sharpness ─────
+        // Sharpness = variance of the discrete Laplacian (4·center − 4-neighbors),
+        // a cheap focus/motion-blur proxy computed in the same pass since it needs
+        // no data pass 1 doesn't already touch.
         var pixelCount = 0
         var sum = 0L
         var sumSq = 0L
+        var lapCount = 0
+        var lapSum = 0L
+        var lapSumSq = 0L
         for (j in 0 until dh) {
             for (i in 0 until dw) {
                 if (!isInsideTarget(i, j, ds, cfg)) continue
@@ -82,9 +173,20 @@ object BlobDetector {
                 pixelCount++
                 sum += v
                 sumSq += v.toLong() * v
+                if (i in 1 until dw - 1 && j in 1 until dh - 1) {
+                    val lap = 4 * v - getPixel(i - 1, j) - getPixel(i + 1, j) - getPixel(i, j - 1) - getPixel(i, j + 1)
+                    lapCount++
+                    lapSum += lap
+                    lapSumSq += lap.toLong() * lap
+                }
             }
         }
         if (pixelCount == 0) return DetectionResult.Failure(FailureReason.NO_DATA, "No pixels in target region")
+
+        val sharpness = if (lapCount > 0) {
+            val lapMean = lapSum.toDouble() / lapCount
+            (lapSumSq.toDouble() / lapCount) - lapMean * lapMean
+        } else 0.0
 
         val overallMean = sum.toDouble() / pixelCount
 
@@ -175,10 +277,19 @@ object BlobDetector {
             )
         }
 
+        // ── Pass 4: boundary refinement → sub-pixel center via CircleFit ──────
+        val estRadiusD = sqrt(fullArea / PI) / ds
+        val refined = refineBoundary(cxD, cyD, estRadiusD, thr, dw, dh, getPixel)
+        val finalXD = refined?.cx ?: cxD
+        val finalYD = refined?.cy ?: cyD
+
         return DetectionResult.Success(
-            x    = (cxD * ds).toFloat(),
-            y    = (cyD * ds).toFloat(),
-            area = fullArea.toDouble()
+            x = (finalXD * ds).toFloat(),
+            y = (finalYD * ds).toFloat(),
+            area = fullArea.toDouble(),
+            circularity = circularity,
+            contrastRatio = contrast,
+            sharpness = sharpness
         )
     }
 

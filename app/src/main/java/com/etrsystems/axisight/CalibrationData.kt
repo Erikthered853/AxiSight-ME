@@ -3,6 +3,12 @@ package com.etrsystems.axisight
 import android.content.Context
 import kotlin.math.hypot
 
+/**
+ * Calibration state, stored in camera image-space pixels (not on-screen view-space
+ * pixels) so it stays valid across screen resolution, orientation, and letterbox
+ * changes. Callers must convert view-space points (e.g. touch taps, live detections)
+ * through [CoordinateMapper] before passing them in or comparing them against this data.
+ */
 data class CalibrationData(
     val centerX: Float,
     val centerY: Float,
