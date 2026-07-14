@@ -174,11 +174,13 @@ class MainActivity : AppCompatActivity() {
             popup.menu.add(0, 1, 0, getString(R.string.cal_set_center))
             popup.menu.add(0, 2, 1, getString(R.string.cal_set_scale))
             popup.menu.add(0, 3, 2, getString(R.string.cal_set_rotation))
+            popup.menu.add(0, 4, 3, getString(R.string.cal_help))
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     1 -> calibrationViewModel.startCenterCalibration()
                     2 -> calibrationViewModel.startScaleCalibration()
                     3 -> calibrationViewModel.startRotationCalibration()
+                    4 -> showCalibrationHelp()
                 }
                 true
             }
@@ -475,6 +477,14 @@ class MainActivity : AppCompatActivity() {
         b.previewView.visibility = View.GONE
         b.textureView.visibility = View.GONE
         camera.usb.start()
+    }
+
+    private fun showCalibrationHelp() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.cal_help_title))
+            .setMessage(getString(R.string.cal_help_body))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     /** Applies one-shot wizard outcomes (messages, persisted calibrations) to the UI. */
