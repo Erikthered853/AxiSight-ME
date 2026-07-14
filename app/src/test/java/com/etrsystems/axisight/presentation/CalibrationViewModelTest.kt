@@ -113,6 +113,39 @@ class CalibrationViewModelTest {
     }
 
     @Test
+    fun `scale wizard converts stored image-space center to view space and back`() {
+        // View is exactly 2x the image with no letterboxing: image (x,y) -> view (2x,2y).
+        viewModel.coordinateMapper.update(640, 480, 0, 1280, 960)
+        store.saveCenter(100f, 100f) // image space
+
+        viewModel.startScaleCalibration()
+        // Wizard state must hold the VIEW-space center.
+        assertEquals(200f to 200f, viewModel.state.value.center)
+
+        viewModel.handleTap(200f, 0f) // 200 px up in view space
+        viewModel.confirmStep(null)
+        viewModel.handleTap(50f, 400f)
+        viewModel.confirmStep(null)
+        viewModel.handleTap(350f, 400f) // 300 px scale span in view space
+        viewModel.confirmStep(null)
+
+        assertEquals(Step.NONE, viewModel.state.value.step)
+        val completed = drainEffects().filterIsInstance<Effect.CalibrationCompleted>().single()
+        // Overlay crosshair gets the view-space center...
+        assertEquals(200f, completed.viewCenterX, 1e-3f)
+        assertEquals(200f, completed.viewCenterY, 1e-3f)
+        // ...while persistence round-trips back to the original image-space center.
+        val persisted = store.load()
+        assertNotNull(persisted)
+        assertEquals(100f, persisted?.centerX ?: 0f, 1e-3f)
+        assertEquals(100f, persisted?.centerY ?: 0f, 1e-3f)
+        // Image-space scale span is 150 px, so persisted in/px uses image pixels.
+        assertEquals(0.1181 / 150.0, persisted?.inchesPerPixel ?: 0.0, 1e-12)
+        // The on-screen display value stays in view pixels.
+        assertEquals(0.1181 / 300.0, completed.viewInchesPerPixel, 1e-12)
+    }
+
+    @Test
     fun `up tap too close to center is rejected and kept pending`() {
         store.saveCenter(300f, 300f)
         viewModel.startScaleCalibration()

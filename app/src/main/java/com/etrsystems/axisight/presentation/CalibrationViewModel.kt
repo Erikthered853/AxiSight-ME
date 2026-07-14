@@ -99,12 +99,18 @@ class CalibrationViewModel(
 
     fun startScaleCalibration() {
         // Require a center to be set first.
-        val center = calibrationStore.load()?.let { it.centerX to it.centerY }
+        val storedCenter = calibrationStore.load()?.let { it.centerX to it.centerY }
             ?: calibrationStore.loadCenterOrNull()
-        if (center == null) {
+        if (storedCenter == null) {
             sendEffect(Effect.Message(R.string.cal_scale_needs_center, isLong = true))
             return
         }
+        // The stored center is in image space, but the wizard works in view
+        // space throughout (taps, quality gating, overlay markers) and
+        // finalizeCalibration converts everything back to image space. Convert
+        // on the way in; before the first frame the mapper is identity, so
+        // this is safe even if no camera is running yet.
+        val center = coordinateMapper.imageToView(storedCenter.first, storedCenter.second)
         clearCaptureBuffers()
         _state.update {
             UiState(step = Step.UP, center = center, knownInches = it.knownInches)
