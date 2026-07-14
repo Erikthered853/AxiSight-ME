@@ -6,9 +6,13 @@ import android.os.Bundle
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
 import com.etrsystems.axisight.camera.CameraController
 import com.etrsystems.axisight.camera.CameraSourceType
@@ -17,7 +21,10 @@ import com.etrsystems.axisight.camera.InternalCameraSource
 import com.etrsystems.axisight.camera.UsbCameraController
 import com.etrsystems.axisight.camera.WifiCameraSource
 import com.etrsystems.axisight.databinding.ActivityMainBinding
+import com.etrsystems.axisight.domain.CalibrationQualityEvaluator
+import com.etrsystems.axisight.presentation.CalibrationViewModel
 import com.etrsystems.axisight.ui.UvcFragment
+import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.*
@@ -28,46 +35,28 @@ class MainActivity : AppCompatActivity() {
     private lateinit var b: ActivityMainBinding
     private lateinit var camera: CameraController
 
+    private val calibrationViewModel: CalibrationViewModel by viewModels {
+        CalibrationViewModel.Factory(CalibrationStore(applicationContext))
+    }
+
     private var simulate = false
     private var autoDetect = true
     private var inPerPx: Double? = null
-    private var knownInches: Double = DEFAULT_KNOWN_INCHES
 
     private val cfgRef = AtomicReference(DetectorConfig())
     private val cfg get() = cfgRef.get()
     private fun updateCfg(block: DetectorConfig.() -> DetectorConfig) { cfgRef.set(cfgRef.get().block()) }
 
     private var latestDetectionQuality: DetectionQuality? = null
-    private val coordinateMapper = CoordinateMapper()
+    // The mapper lives in the ViewModel so wizard state and coordinate mapping
+    // survive configuration changes together; camera frames refresh it anyway.
+    private val coordinateMapper get() = calibrationViewModel.coordinateMapper
     private val detectionFilter = DetectionFilter()
-    private val frameAnalyzer = FrameAnalyzer(coordinateMapper, detectionFilter) { cfg }
+    private val frameAnalyzer by lazy { FrameAnalyzer(coordinateMapper, detectionFilter) { cfg } }
 
-    private enum class CalibrationStep { NONE, CENTER, UP, SCALE_P1, SCALE_P2 }
-    private var calibrationStep = CalibrationStep.NONE
-    private var isCenterOnlyMode = false  // true = Set Center only; false = full or scale+direction wizard
-    private var calCenter: Pair<Float, Float>? = null
-    private var calUpPoint: Pair<Float, Float>? = null
-    private var calScaleP1: Pair<Float, Float>? = null
-    private var calScaleP2: Pair<Float, Float>? = null
-    private var pendingCalTap: Pair<Float, Float>? = null
     private var calibrationData: CalibrationData? = null
     private var latestToolPoint: Pair<Float, Float>? = null
     private var pendingLoadedCalibrationRestore = false
-
-    // Auto-detect center: collect AUTO_SAMPLE_TARGET frames and average them
-    private val AUTO_SAMPLE_TARGET = 30
-    private val autoSamples = mutableListOf<Pair<Float, Float>>()
-    private var isAutoCapturingCenter = false
-
-    // Rotation-based center calibration: operator rotates the spindle by hand while the
-    // detected tool position is traced, then CircleFit derives the true centerline.
-    private var isRotationMode = false
-    private var isRotationCapturing = false
-    private val rotationSamples = mutableListOf<Pair<Float, Float>>()
-    private val rotationCoverageBuckets = BooleanArray(ROTATION_COVERAGE_BUCKETS)
-    private var rotationSumX = 0.0
-    private var rotationSumY = 0.0
-    private var lastRotationFitQuality: RotationFitQuality? = null
 
     private var simAngle = 0.0
     private var simRadiusPx = 200f
@@ -187,21 +176,23 @@ class MainActivity : AppCompatActivity() {
             popup.menu.add(0, 3, 2, getString(R.string.cal_set_rotation))
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
-                    1 -> startCenterCalibration()
-                    2 -> startScaleCalibration()
-                    3 -> startRotationCalibration()
+                    1 -> calibrationViewModel.startCenterCalibration()
+                    2 -> calibrationViewModel.startScaleCalibration()
+                    3 -> calibrationViewModel.startRotationCalibration()
                 }
                 true
             }
             popup.show()
         }
-        b.btnCalConfirm.setOnClickListener { confirmCalibrationStep() }
-        b.btnCalRetry.setOnClickListener { retryCalibrationStep() }
-        b.btnCalCancel.setOnClickListener { cancelCalibrationWizard() }
-        b.btnCalAutoCenter.setOnClickListener { startAutoCapturingCenter() }
-        b.btnCalRotationCapture.setOnClickListener {
-            if (isRotationCapturing) finishRotationCapture() else startRotationCapture()
+        b.btnCalConfirm.setOnClickListener {
+            calibrationViewModel.confirmStep(b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull())
         }
+        b.btnCalRetry.setOnClickListener { calibrationViewModel.retryStep() }
+        b.btnCalCancel.setOnClickListener { calibrationViewModel.cancelWizard() }
+        b.btnCalAutoCenter.setOnClickListener {
+            calibrationViewModel.startAutoCapture(hasLiveToolPoint = latestToolPoint != null)
+        }
+        b.btnCalRotationCapture.setOnClickListener { calibrationViewModel.toggleRotationCapture() }
         b.btnExport.setOnClickListener { view ->
             val popup = android.widget.PopupMenu(this, view)
             popup.menu.add(0, 1, 0, getString(R.string.export_points_csv))
@@ -313,7 +304,17 @@ class MainActivity : AppCompatActivity() {
         applyLoadedCalibration()
         updateParamsSummary()
         updateDeltaReadout()
-        updateCalibrationPanel()
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    calibrationViewModel.state.collect { renderCalibrationPanel(it) }
+                }
+                launch {
+                    calibrationViewModel.effects.collect { handleCalibrationEffect(it) }
+                }
+            }
+        }
 
         b.edMmPerPx.setOnEditorActionListener { v, _, _ ->
             // The field shows/accepts inches-per-VIEW-pixel (what the operator sees on
@@ -332,16 +333,18 @@ class MainActivity : AppCompatActivity() {
         }
         b.edKnownMm.setText(getString(R.string.default_known_mm))
         b.edKnownMm.setOnEditorActionListener { v, _, _ ->
-            knownInches = v.text?.toString()?.toDoubleOrNull() ?: DEFAULT_KNOWN_INCHES
+            calibrationViewModel.onKnownInchesChanged(v.text?.toString()?.toDoubleOrNull())
             true
         }
 
         b.overlay.setOnTouchListener { view, ev ->
+            val calibrationActive =
+                calibrationViewModel.state.value.step != CalibrationViewModel.Step.NONE
             when (ev.action) {
                 MotionEvent.ACTION_DOWN -> {
                     val x = ev.x
                     val y = ev.y
-                    if (!handleCalibrationTap(x, y)) {
+                    if (!calibrationViewModel.handleTap(x, y)) {
                         touchDownX = x
                         touchDownY = y
                         isResizingTarget = isNearTargetEdge(x, y)
@@ -353,14 +356,14 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    if (calibrationStep == CalibrationStep.NONE && isResizingTarget) {
+                    if (!calibrationActive && isResizingTarget) {
                         val radius = hypot((ev.x - b.overlay.targetX).toDouble(), (ev.y - b.overlay.targetY).toDouble()).toFloat()
                         b.overlay.setTargetRadius(radius)
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (calibrationStep == CalibrationStep.NONE && !isResizingTarget) {
+                    if (!calibrationActive && !isResizingTarget) {
                         val moveDistance = hypot((ev.x - touchDownX).toDouble(), (ev.y - touchDownY).toDouble()).toFloat()
                         if (moveDistance <= targetTapSlopPx) {
                             b.overlay.setTargetCenter(ev.x, ev.y)
@@ -474,326 +477,35 @@ class MainActivity : AppCompatActivity() {
         camera.usb.start()
     }
 
-    private fun startCenterCalibration() {
-        isCenterOnlyMode = true
-        resetRotationCaptureState()
-        calibrationStep = CalibrationStep.CENTER
-        calCenter = null
-        calUpPoint = null
-        calScaleP1 = null
-        calScaleP2 = null
-        pendingCalTap = null
-        updateCalibrationPanel()
-    }
-
-    private fun startScaleCalibration() {
-        // Require a center to be set first
-        val center = calibrationData?.let { it.centerX to it.centerY }
-            ?: calibrationStore.loadCenterOrNull()
-        if (center == null) {
-            Toast.makeText(this, getString(R.string.cal_scale_needs_center), Toast.LENGTH_LONG).show()
-            return
-        }
-        isCenterOnlyMode = false
-        resetRotationCaptureState()
-        calCenter = center
-        calUpPoint = null
-        calScaleP1 = null
-        calScaleP2 = null
-        pendingCalTap = null
-        calibrationStep = CalibrationStep.UP
-        updateCalibrationPanel()
-    }
-
-    private fun startRotationCalibration() {
-        isCenterOnlyMode = true
-        isRotationMode = true
-        resetRotationCaptureState()
-        calibrationStep = CalibrationStep.CENTER
-        calCenter = null
-        calUpPoint = null
-        calScaleP1 = null
-        calScaleP2 = null
-        pendingCalTap = null
-        updateCalibrationPanel()
-    }
-
-    private fun resetRotationCaptureState() {
-        isRotationMode = false
-        isRotationCapturing = false
-        rotationSamples.clear()
-        rotationCoverageBuckets.fill(false)
-        rotationSumX = 0.0
-        rotationSumY = 0.0
-        lastRotationFitQuality = null
-    }
-
-    private fun startRotationCapture() {
-        isRotationCapturing = true
-        rotationSamples.clear()
-        rotationCoverageBuckets.fill(false)
-        rotationSumX = 0.0
-        rotationSumY = 0.0
-        lastRotationFitQuality = null
-        pendingCalTap = null
-        updateCalibrationPanel()
-    }
-
-    private fun finishRotationCapture() {
-        isRotationCapturing = false
-        val quality = evaluateRotationFit(rotationSamples)
-        lastRotationFitQuality = quality
-        pendingCalTap = if (quality != null && quality.acceptable) {
-            quality.centerX to quality.centerY
-        } else {
-            Toast.makeText(this, getString(R.string.calibration_rotation_quality_fail), Toast.LENGTH_LONG).show()
-            null
-        }
-        updateCalibrationPanel()
-    }
-
-    private fun evaluateRotationFit(samples: List<Pair<Float, Float>>): RotationFitQuality? {
-        if (samples.size < MIN_ROTATION_SAMPLES) {
-            return RotationFitQuality(0f, 0f, 0.0, 0.0, samples.size, acceptable = false)
-        }
-        val fit = CircleFit.fit(samples.map { it.first.toDouble() to it.second.toDouble() })
-            ?: return RotationFitQuality(0f, 0f, 0.0, 0.0, samples.size, acceptable = false)
-        val coverage = rotationCoverageFraction(samples, fit.cx, fit.cy)
-        val acceptable = coverage >= MIN_ROTATION_COVERAGE_FRACTION && fit.rms <= MAX_ROTATION_FIT_RMS_PX
-        return RotationFitQuality(
-            centerX = fit.cx.toFloat(),
-            centerY = fit.cy.toFloat(),
-            rms = fit.rms,
-            coverageFraction = coverage,
-            sampleCount = samples.size,
-            acceptable = acceptable
-        )
-    }
-
-    private fun rotationCoverageFraction(samples: List<Pair<Float, Float>>, cx: Double, cy: Double): Double {
-        if (samples.isEmpty()) return 0.0
-        val visited = BooleanArray(ROTATION_COVERAGE_BUCKETS)
-        val bucketSizeDeg = 360.0 / ROTATION_COVERAGE_BUCKETS
-        for ((x, y) in samples) {
-            val deg = (Math.toDegrees(atan2(y - cy, x - cx)) + 360.0) % 360.0
-            val idx = (deg / bucketSizeDeg).toInt().coerceIn(0, ROTATION_COVERAGE_BUCKETS - 1)
-            visited[idx] = true
-        }
-        return visited.count { it }.toDouble() / ROTATION_COVERAGE_BUCKETS
-    }
-
-    private data class RotationFitQuality(
-        val centerX: Float,
-        val centerY: Float,
-        val rms: Double,
-        val coverageFraction: Double,
-        val sampleCount: Int,
-        val acceptable: Boolean
-    )
-
-    private fun handleCalibrationTap(x: Float, y: Float): Boolean {
-        if (calibrationStep == CalibrationStep.NONE) return false
-        pendingCalTap = x to y
-        updateCalibrationPanel()
-        return true
-    }
-
-    private fun confirmCalibrationStep() {
-        if (calibrationStep == CalibrationStep.NONE) return
-        val tap = pendingCalTap ?: return
-        pendingCalTap = null
-
-        when (calibrationStep) {
-            CalibrationStep.NONE -> Unit
-            CalibrationStep.CENTER -> {
-                calCenter = tap
-                if (isCenterOnlyMode) {
-                    // Save center only — crosshairs move, scale/direction unchanged.
-                    // Persist in image space (via CoordinateMapper) so calibration survives
-                    // resolution/orientation changes; the overlay crosshair still uses the
-                    // original view-space tap since it draws on screen.
-                    val (imgX, imgY) = coordinateMapper.viewToImage(tap.first, tap.second)
-                    calibrationStore.saveCenter(imgX, imgY)
-                    b.overlay.setTrueCenter(tap.first, tap.second)
-                    val existing = calibrationData
-                    if (existing != null) {
-                        val updated = existing.copy(centerX = imgX, centerY = imgY)
-                        calibrationData = updated
-                        calibrationStore.save(updated)
-                        updateDeltaReadout()
-                    }
-                    cancelCalibrationWizard()
-                    Toast.makeText(this, getString(R.string.cal_center_saved), Toast.LENGTH_SHORT).show()
-                    return
+    /** Applies one-shot wizard outcomes (messages, persisted calibrations) to the UI. */
+    private fun handleCalibrationEffect(effect: CalibrationViewModel.Effect) {
+        when (effect) {
+            is CalibrationViewModel.Effect.Message -> {
+                val duration = if (effect.isLong) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+                Toast.makeText(this, getString(effect.resId), duration).show()
+            }
+            is CalibrationViewModel.Effect.CenterSaved -> {
+                b.overlay.setTrueCenter(effect.viewX, effect.viewY)
+                if (effect.updatedData != null) {
+                    calibrationData = effect.updatedData
+                    updateDeltaReadout()
                 }
-                calibrationStep = CalibrationStep.UP
             }
-            CalibrationStep.UP -> {
-                val center = calCenter
-                if (center == null) {
-                    calibrationStep = CalibrationStep.CENTER
-                    Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
-                    updateCalibrationPanel()
-                    return
-                }
-                val upDist = hypot((tap.first - center.first).toDouble(), (tap.second - center.second).toDouble())
-                if (upDist < MIN_UP_DISTANCE_PX) {
-                    pendingCalTap = tap
-                    Toast.makeText(this, getString(R.string.calibration_quality_fail), Toast.LENGTH_SHORT).show()
-                    updateCalibrationPanel()
-                    return
-                }
-                calUpPoint = tap
-                calibrationStep = CalibrationStep.SCALE_P1
-            }
-            CalibrationStep.SCALE_P1 -> {
-                calScaleP1 = tap
-                calibrationStep = CalibrationStep.SCALE_P2
-            }
-            CalibrationStep.SCALE_P2 -> {
-                calScaleP2 = tap
-                tryFinalizeCalibration()
+            is CalibrationViewModel.Effect.CalibrationCompleted -> {
+                calibrationData = effect.data
+                inPerPx = effect.viewInchesPerPixel // view-space, for the on-screen in/px display
+                b.overlay.mmPerPx = inPerPx?.times(25.4)
+                b.edMmPerPx.setText(String.format(Locale.US, "%.6f", effect.viewInchesPerPixel))
+                b.overlay.setTrueCenter(effect.viewCenterX, effect.viewCenterY)
+                updateParamsSummary()
+                updateDeltaReadout()
             }
         }
-        updateCalibrationPanel()
     }
 
-    private fun retryCalibrationStep() {
-        if (calibrationStep == CalibrationStep.NONE) return
-        isAutoCapturingCenter = false
-        autoSamples.clear()
-        pendingCalTap = null
-        when (calibrationStep) {
-            CalibrationStep.CENTER -> {
-                calCenter = null
-                isRotationCapturing = false
-                rotationSamples.clear()
-                rotationCoverageBuckets.fill(false)
-                rotationSumX = 0.0
-                rotationSumY = 0.0
-                lastRotationFitQuality = null
-            }
-            CalibrationStep.UP -> calUpPoint = null
-            CalibrationStep.SCALE_P1 -> calScaleP1 = null
-            CalibrationStep.SCALE_P2 -> calScaleP2 = null
-            CalibrationStep.NONE -> Unit
-        }
-        updateCalibrationPanel()
-    }
-
-    private fun cancelCalibrationWizard() {
-        isAutoCapturingCenter = false
-        autoSamples.clear()
-        isCenterOnlyMode = false
-        resetRotationCaptureState()
-        calibrationStep = CalibrationStep.NONE
-        pendingCalTap = null
-        calCenter = null
-        calUpPoint = null
-        calScaleP1 = null
-        calScaleP2 = null
-        updateCalibrationPanel()
-    }
-
-    private fun tryFinalizeCalibration() {
-        val center = calCenter
-        val upPoint = calUpPoint
-        val scaleP1 = calScaleP1
-        val scaleP2 = calScaleP2
-        if (center == null || upPoint == null || scaleP1 == null || scaleP2 == null) {
-            Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val typedKnownInches = b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull()
-        if (typedKnownInches != null && typedKnownInches > 0.0) {
-            knownInches = typedKnownInches
-        }
-        if (knownInches <= 0.0) {
-            Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val quality = evaluateCalibrationQuality(center, upPoint, scaleP1, scaleP2, knownInches)
-        if (!quality.acceptable) {
-            b.txtCalQuality.text = getString(R.string.calibration_quality_fail)
-            Toast.makeText(this, getString(R.string.calibration_quality_fail), Toast.LENGTH_LONG).show()
-            return
-        }
-
-        // Persist in image space (via CoordinateMapper) so calibration survives
-        // resolution/orientation changes; quality gating above stays in view-space
-        // since it's modeling tap-finger precision, which is a screen-space concept.
-        val (imgCenterX, imgCenterY) = coordinateMapper.viewToImage(center.first, center.second)
-        val (imgUpX, imgUpY) = coordinateMapper.viewToImage(upPoint.first, upPoint.second)
-        val (imgScaleP1X, imgScaleP1Y) = coordinateMapper.viewToImage(scaleP1.first, scaleP1.second)
-        val (imgScaleP2X, imgScaleP2Y) = coordinateMapper.viewToImage(scaleP2.first, scaleP2.second)
-        val imageScaleDistancePx = hypot(
-            (imgScaleP2X - imgScaleP1X).toDouble(),
-            (imgScaleP2Y - imgScaleP1Y).toDouble()
-        ).coerceAtLeast(1.0)
-        val imageInchesPerPixel = knownInches / imageScaleDistancePx
-
-        val data = CalibrationData.fromCenterUpAndScale(
-            centerX = imgCenterX,
-            centerY = imgCenterY,
-            upPointX = imgUpX,
-            upPointY = imgUpY,
-            inchesPerPixel = imageInchesPerPixel
-        )
-        if (data == null) {
-            Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        calibrationData = data
-        inPerPx = quality.inchesPerPixel // view-space, for the on-screen in/px display
-        b.overlay.mmPerPx = inPerPx?.times(25.4)
-        b.edMmPerPx.setText(String.format(Locale.US, "%.6f", quality.inchesPerPixel))
-        calibrationStore.save(data)
-        b.overlay.setTrueCenter(center.first, center.second)
-        calibrationStep = CalibrationStep.NONE
-        pendingCalTap = null
-        updateCalibrationPanel()
-        updateParamsSummary()
-        updateDeltaReadout()
-        Toast.makeText(this, getString(R.string.calibration_complete), Toast.LENGTH_SHORT).show()
-    }
-
-    private fun evaluateCalibrationQuality(
-        center: Pair<Float, Float>,
-        upPoint: Pair<Float, Float>,
-        scaleP1: Pair<Float, Float>,
-        scaleP2: Pair<Float, Float>,
-        knownInches: Double
-    ): CalibrationQuality {
-        val upDistancePx = hypot((upPoint.first - center.first).toDouble(), (upPoint.second - center.second).toDouble())
-        val scaleDistancePx = hypot((scaleP2.first - scaleP1.first).toDouble(), (scaleP2.second - scaleP1.second).toDouble())
-        val safeScalePx = scaleDistancePx.coerceAtLeast(1.0)
-        val inchesPerPixel = knownInches / safeScalePx
-
-        // Endpoint quantization estimate assuming +/-1px around each tap.
-        val scaleErrorIn = knownInches * (sqrt(2.0) / safeScalePx)
-        // Angular uncertainty estimate from 1px tap uncertainty on up vector.
-        val angularErrorRad = atan2(1.0, upDistancePx.coerceAtLeast(1.0))
-        val axisErrorAtOneIn = tan(angularErrorRad)
-        val combinedErrorIn = hypot(scaleErrorIn, axisErrorAtOneIn)
-
-        val acceptable = upDistancePx >= MIN_UP_DISTANCE_PX &&
-            scaleDistancePx >= MIN_SCALE_DISTANCE_PX &&
-            combinedErrorIn <= MAX_COMBINED_ERROR_IN
-
-        return CalibrationQuality(
-            upDistancePx = upDistancePx,
-            scaleDistancePx = scaleDistancePx,
-            inchesPerPixel = inchesPerPixel,
-            combinedErrorIn = combinedErrorIn,
-            acceptable = acceptable
-        )
-    }
-
-    private fun updateCalibrationPanel() {
-        val active = calibrationStep != CalibrationStep.NONE
+    /** Renders the calibration panel and overlay markers from the wizard state. */
+    private fun renderCalibrationPanel(s: CalibrationViewModel.UiState) {
+        val active = s.step != CalibrationViewModel.Step.NONE
         b.calibrationPanel.visibility = if (active) View.VISIBLE else View.GONE
         if (active) {
             tuningPanelVisible = false
@@ -810,30 +522,33 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val stepText = when (calibrationStep) {
-            CalibrationStep.NONE -> ""
-            CalibrationStep.CENTER -> if (isRotationMode) getString(R.string.calibration_step_rotation) else getString(R.string.calibration_step_center)
-            CalibrationStep.UP -> getString(R.string.calibration_step_scale_up)
-            CalibrationStep.SCALE_P1 -> getString(R.string.calibration_step_scale_1)
-            CalibrationStep.SCALE_P2 -> getString(R.string.calibration_step_scale_2)
+        val stepText = when (s.step) {
+            CalibrationViewModel.Step.NONE -> ""
+            CalibrationViewModel.Step.CENTER -> if (s.isRotationMode) getString(R.string.calibration_step_rotation) else getString(R.string.calibration_step_center)
+            CalibrationViewModel.Step.UP -> getString(R.string.calibration_step_scale_up)
+            CalibrationViewModel.Step.SCALE_P1 -> getString(R.string.calibration_step_scale_1)
+            CalibrationViewModel.Step.SCALE_P2 -> getString(R.string.calibration_step_scale_2)
         }
         b.txtCalStep.text = stepText
 
+        val isRotationCenterStep = s.step == CalibrationViewModel.Step.CENTER && s.isRotationMode
         b.txtCalCapture.text = when {
-            calibrationStep == CalibrationStep.CENTER && isRotationMode && isRotationCapturing ->
-                b.txtCalCapture.text // left as-is; updated live per-frame in onToolPointDetected
-            calibrationStep == CalibrationStep.CENTER && isRotationMode && pendingCalTap != null -> {
-                val (x, y) = pendingCalTap!!
+            isRotationCenterStep && s.isRotationCapturing ->
+                getString(R.string.calibration_rotation_collecting, s.rotationSampleCount, s.rotationCoveragePercent)
+            isRotationCenterStep && s.pendingTap != null -> {
+                val (x, y) = s.pendingTap
                 getString(R.string.calibration_point_captured, x, y)
             }
-            calibrationStep == CalibrationStep.CENTER && isRotationMode -> getString(R.string.calibration_rotation_idle)
-            else -> pendingCalTap?.let { (x, y) -> getString(R.string.calibration_point_captured, x, y) }
+            isRotationCenterStep -> getString(R.string.calibration_rotation_idle)
+            s.isAutoCapturingCenter ->
+                getString(R.string.calibration_auto_collecting, s.autoSampleCount, CalibrationViewModel.AUTO_SAMPLE_TARGET)
+            else -> s.pendingTap?.let { (x, y) -> getString(R.string.calibration_point_captured, x, y) }
                 ?: getString(R.string.calibration_step_wait_tap)
         }
 
         val qualityText = when {
-            calibrationStep == CalibrationStep.CENTER && isRotationMode && lastRotationFitQuality != null -> {
-                val q = lastRotationFitQuality!!
+            isRotationCenterStep && s.rotationFitQuality != null -> {
+                val q = s.rotationFitQuality
                 getString(
                     R.string.calibration_rotation_quality_value,
                     q.sampleCount,
@@ -841,14 +556,14 @@ class MainActivity : AppCompatActivity() {
                     q.rms
                 )
             }
-            calibrationStep == CalibrationStep.SCALE_P2 && calCenter != null && calUpPoint != null && calScaleP1 != null && pendingCalTap != null -> {
+            s.step == CalibrationViewModel.Step.SCALE_P2 && s.center != null && s.upPoint != null && s.scaleP1 != null && s.pendingTap != null -> {
                 val typedKnownInches = b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull()
-                val useKnown = if (typedKnownInches != null && typedKnownInches > 0.0) typedKnownInches else knownInches
-                val q = evaluateCalibrationQuality(
-                    center = calCenter!!,
-                    upPoint = calUpPoint!!,
-                    scaleP1 = calScaleP1!!,
-                    scaleP2 = pendingCalTap!!,
+                val useKnown = if (typedKnownInches != null && typedKnownInches > 0.0) typedKnownInches else s.knownInches
+                val q = CalibrationQualityEvaluator.evaluate(
+                    center = s.center,
+                    upPoint = s.upPoint,
+                    scaleP1 = s.scaleP1,
+                    scaleP2 = s.pendingTap,
                     knownInches = useKnown
                 )
                 getString(
@@ -861,36 +576,28 @@ class MainActivity : AppCompatActivity() {
             else -> getString(R.string.calibration_quality_pending)
         }
         b.txtCalQuality.text = qualityText
-        b.btnCalConfirm.isEnabled = pendingCalTap != null && (!isRotationMode || lastRotationFitQuality?.acceptable == true)
-        val showAutoBtn = calibrationStep == CalibrationStep.CENTER && isCenterOnlyMode && !isRotationMode
+        b.btnCalConfirm.isEnabled = s.pendingTap != null && (!s.isRotationMode || s.rotationFitQuality?.acceptable == true)
+        val showAutoBtn = s.step == CalibrationViewModel.Step.CENTER && s.isCenterOnlyMode && !s.isRotationMode
         b.btnCalAutoCenter.visibility = if (showAutoBtn) View.VISIBLE else View.GONE
-        if (showAutoBtn) b.btnCalAutoCenter.isEnabled = !isAutoCapturingCenter
-        val showRotationBtn = calibrationStep == CalibrationStep.CENTER && isRotationMode
+        if (showAutoBtn) b.btnCalAutoCenter.isEnabled = !s.isAutoCapturingCenter
+        val showRotationBtn = s.step == CalibrationViewModel.Step.CENTER && s.isRotationMode
         b.btnCalRotationCapture.visibility = if (showRotationBtn) View.VISIBLE else View.GONE
         if (showRotationBtn) {
             b.btnCalRotationCapture.isEnabled = true
-            b.btnCalRotationCapture.text = if (isRotationCapturing) {
+            b.btnCalRotationCapture.text = if (s.isRotationCapturing) {
                 getString(R.string.calibration_rotation_finish)
             } else {
                 getString(R.string.calibration_rotation_start)
             }
         }
         b.overlay.setCalibrationMarkers(
-            center = calCenter,
-            up = calUpPoint,
-            scaleP1 = calScaleP1,
-            scaleP2 = calScaleP2,
-            pending = pendingCalTap
+            center = s.center,
+            up = s.upPoint,
+            scaleP1 = s.scaleP1,
+            scaleP2 = s.scaleP2,
+            pending = s.pendingTap
         )
     }
-
-    private data class CalibrationQuality(
-        val upDistancePx: Double,
-        val scaleDistancePx: Double,
-        val inchesPerPixel: Double,
-        val combinedErrorIn: Double,
-        val acceptable: Boolean
-    )
 
     private fun applyLoadedCalibration() {
         // Stored calibration/center is in image space, but restoring the on-screen
@@ -928,52 +635,10 @@ class MainActivity : AppCompatActivity() {
         b.overlay.addPoint(x, y)
         latestToolPoint = x to y
         if (quality != null) latestDetectionQuality = quality
-        if (isRotationCapturing) {
-            rotationSamples.add(x to y)
-            rotationSumX += x
-            rotationSumY += y
-            if (rotationSamples.size >= 3) {
-                val meanX = rotationSumX / rotationSamples.size
-                val meanY = rotationSumY / rotationSamples.size
-                val bucketSizeDeg = 360.0 / ROTATION_COVERAGE_BUCKETS
-                val deg = (Math.toDegrees(atan2(y - meanY, x - meanX)) + 360.0) % 360.0
-                val idx = (deg / bucketSizeDeg).toInt().coerceIn(0, ROTATION_COVERAGE_BUCKETS - 1)
-                rotationCoverageBuckets[idx] = true
-            }
-            val coveragePct = (rotationCoverageBuckets.count { it }.toDouble() / ROTATION_COVERAGE_BUCKETS * 100).roundToInt()
-            b.txtCalCapture.text = getString(R.string.calibration_rotation_collecting, rotationSamples.size, coveragePct)
-            if (rotationSamples.size >= MAX_ROTATION_SAMPLES) finishRotationCapture()
-            return
-        }
-        if (isAutoCapturingCenter) {
-            autoSamples.add(x to y)
-            b.txtCalCapture.text = getString(R.string.calibration_auto_collecting, autoSamples.size, AUTO_SAMPLE_TARGET)
-            if (autoSamples.size >= AUTO_SAMPLE_TARGET) finishAutoCapture()
-            return
-        }
+        // Rotation/auto-center captures consume the point; panel text updates via state.
+        if (calibrationViewModel.onToolPoint(x, y)) return
         updateDeltaReadout()
         updateQualityReadout()
-    }
-
-    private fun startAutoCapturingCenter() {
-        if (latestToolPoint == null) {
-            Toast.makeText(this, getString(R.string.calibration_auto_no_tool), Toast.LENGTH_SHORT).show()
-            return
-        }
-        autoSamples.clear()
-        isAutoCapturingCenter = true
-        b.btnCalAutoCenter.isEnabled = false
-        b.txtCalCapture.text = getString(R.string.calibration_auto_collecting, 0, AUTO_SAMPLE_TARGET)
-    }
-
-    private fun finishAutoCapture() {
-        isAutoCapturingCenter = false
-        val avgX = autoSamples.map { it.first }.average().toFloat()
-        val avgY = autoSamples.map { it.second }.average().toFloat()
-        autoSamples.clear()
-        pendingCalTap = avgX to avgY
-        updateCalibrationPanel()
-        updateDeltaReadout()
     }
 
     /**
@@ -1187,16 +852,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val MIN_UP_DISTANCE_PX = 40.0
-        private const val MIN_SCALE_DISTANCE_PX = 80.0
-        private const val MAX_COMBINED_ERROR_IN = 0.020
-        const val DEFAULT_KNOWN_INCHES = 0.1181  // Standard 3mm reference (0.015" bore use-case)
-        private const val ROTATION_COVERAGE_BUCKETS = 24
-        private const val MIN_ROTATION_SAMPLES = 40
-        private const val MAX_ROTATION_SAMPLES = 600
-        private const val MIN_ROTATION_COVERAGE_FRACTION = 0.75 // ~270 degrees of the trace
-        private const val MAX_ROTATION_FIT_RMS_PX = 3.0
-
         // Quality-readout tiers (green/yellow/red). Starting points, not empirically
         // tuned against real hardware yet — adjust once field data is available.
         private const val FIT_RMS_GOOD_PX = 1.5
