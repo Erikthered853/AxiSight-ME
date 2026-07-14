@@ -177,12 +177,12 @@ class UsbCameraController(
         }
     }
 
-    /** Unregisters receivers and cancels pending retries. Call from onDestroy. */
+    /** Unregisters receivers and cancels pending retries/restarts. Call from onDestroy. */
     fun dispose() {
         unregisterPermissionReceiverIfNeeded()
         unregisterRecoveryReceiverIfNeeded()
         unregisterAttachReceiverIfNeeded()
-        pendingRetryRunnable?.let { mainHandler.removeCallbacks(it) }
+        mainHandler.removeCallbacksAndMessages(null)
         pendingRetryRunnable = null
     }
 
@@ -202,7 +202,7 @@ class UsbCameraController(
 
     private fun restartAfterDelay(delayMs: Long) {
         mainHandler.postDelayed({
-            if (host.isActiveSource) {
+            if (host.isActiveSource && !activity.isFinishing && !activity.isDestroyed) {
                 start()
             }
         }, delayMs)
