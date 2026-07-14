@@ -1,59 +1,32 @@
 package com.etrsystems.axisight
 
 import android.Manifest
-import android.app.PendingIntent
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.graphics.SurfaceTexture
-import android.hardware.usb.UsbDevice
-import android.hardware.usb.UsbManager
-import com.etrsystems.axisight.usb.UsbDeviceUtils
-import android.os.Build
 import android.os.Bundle
-import android.os.SystemClock
-import android.util.Log
 import android.view.MotionEvent
-import android.view.Surface
-import android.view.TextureView
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.*
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
-import com.etrsystems.axisight.databinding.ActivityMainBinding
-import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.rtsp.RtspMediaSource
+import com.etrsystems.axisight.camera.CameraController
+import com.etrsystems.axisight.camera.CameraSourceType
+import com.etrsystems.axisight.camera.FrameAnalyzer
+import com.etrsystems.axisight.camera.InternalCameraSource
+import com.etrsystems.axisight.camera.UsbCameraController
+import com.etrsystems.axisight.camera.WifiCameraSource
+import com.etrsystems.axisight.databinding.ActivityMainBinding
+import com.etrsystems.axisight.ui.UvcFragment
 import java.util.Locale
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.*
 
 @UnstableApi
-class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMainBinding
-    private var cameraProvider: ProcessCameraProvider? = null
-    private var imageAnalyzer: ImageAnalysis? = null
-    private var exoPlayer: ExoPlayer? = null
-    private var usbPermissionReceiverRegistered = false
-    private var usbRecoveryReceiverRegistered = false
-    private var usbAttachReceiverRegistered = false
-    private var pendingUsbDeviceName: String? = null
-    private var usbPermissionRequestInFlight = false
-    private var lastUsbPermissionRequestMs = 0L
-    private val usbPermissionAction by lazy { "${BuildConfig.APPLICATION_ID}.USB_PERMISSION" }
-    // Limits automatic reconnect attempts in MainActivity USB mode to prevent infinite loops.
-    private var usbFragmentRetryCount = 0
-
-    private enum class CameraSource { INTERNAL, WIFI, USB }
-    private var cameraSource = CameraSource.INTERNAL
+    private lateinit var camera: CameraController
 
     private var simulate = false
     private var autoDetect = true
@@ -64,14 +37,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private val cfg get() = cfgRef.get()
     private fun updateCfg(block: DetectorConfig.() -> DetectorConfig) { cfgRef.set(cfgRef.get().block()) }
 
-    private data class DetectionQuality(
-        val circularity: Double,
-        val contrastRatio: Double,
-        val sharpness: Double
-    )
     private var latestDetectionQuality: DetectionQuality? = null
     private val coordinateMapper = CoordinateMapper()
     private val detectionFilter = DetectionFilter()
+    private val frameAnalyzer = FrameAnalyzer(coordinateMapper, detectionFilter) { cfg }
 
     private enum class CalibrationStep { NONE, CENTER, UP, SCALE_P1, SCALE_P2 }
     private var calibrationStep = CalibrationStep.NONE
@@ -115,7 +84,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     
     // Manual Locking
     private var isLocked = false
-    private var lockRequest = false
     private var trackingEnabled = true
     private var tuningPanelVisible = false
 
@@ -124,94 +92,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var alignmentHistoryStore: AlignmentHistoryStore
     private var latestDeltaInches: Pair<Double, Double>? = null
     private var lastAlignmentToolLabel: String = ""
-    private val analysisExecutor = Executors.newSingleThreadExecutor()
-    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private var pendingUsbRetryRunnable: Runnable? = null
 
     private val camPerm = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
-        if (perms[Manifest.permission.CAMERA] == true) startCamera()
-    }
-
-    private val usbPermissionReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (cameraSource != CameraSource.USB || simulate) return
-            if (intent?.action != usbPermissionAction) return
-
-            val device = getUsbDeviceExtra(intent)
-            val expected = pendingUsbDeviceName
-            usbPermissionRequestInFlight = false
-            if (expected != null && device?.deviceName != expected) {
-                pendingUsbDeviceName = null
-                Log.w(
-                    TAG,
-                    "USB permission callback device changed. expected=$expected actual=${device?.deviceName}"
-                )
-                b.root.postDelayed({
-                    if (cameraSource == CameraSource.USB && !simulate) {
-                        startUsbCamera()
-                    }
-                }, USB_RECONNECT_DELAY_MS)
-                return
-            }
-            pendingUsbDeviceName = null
-
-            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-            if (!granted) {
-                Log.w(TAG, "USB permission denied; scheduling retry")
-                Toast.makeText(
-                    this@MainActivity,
-                    "USB permission denied. Retrying...",
-                    Toast.LENGTH_LONG
-                ).show()
-                scheduleUsbFragmentRetry("permission denied")
-                return
-            }
-
-            val opened = openPermittedUsbCamera(preferredDevice = device)
-            if (!opened) {
-                Log.w(TAG, "USB permission granted but no permitted UVC device was immediately available")
-                b.root.postDelayed({
-                    if (cameraSource == CameraSource.USB && !simulate) {
-                        startUsbCamera()
-                    }
-                }, USB_RECONNECT_DELAY_MS)
-            }
-        }
-    }
-
-    private val usbMonitorRecoveryReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action != AxisightApp.ACTION_USB_MONITOR_RACE) return
-            if (cameraSource != CameraSource.USB || simulate) return
-            if (usbPermissionRequestInFlight) return
-
-            stopUsbCamera()
-            b.root.postDelayed({
-                if (cameraSource == CameraSource.USB && !simulate) {
-                    startUsbCamera()
-                }
-            }, 500L)
-        }
-    }
-
-    private val usbAttachReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (cameraSource != CameraSource.USB || simulate) return
-            when (intent?.action) {
-                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                    b.root.postDelayed({
-                        if (cameraSource == CameraSource.USB && !simulate) {
-                            startUsbCamera()
-                        }
-                    }, USB_RECONNECT_DELAY_MS)
-                }
-                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                    stopUsbCamera()
-                }
-            }
-        }
+        if (perms[Manifest.permission.CAMERA] == true) startInternalCamera()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -221,8 +106,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         val density = resources.displayMetrics.density
         targetTapSlopPx = 18f * density
         targetEdgeTolerancePx = 24f * density
-        registerUsbMonitorRecoveryReceiverIfNeeded()
-        registerUsbAttachReceiverIfNeeded()
+        camera = buildCameraController()
 
         csvLogger = CsvLogger(this)
         calibrationStore = CalibrationStore(this)
@@ -239,23 +123,23 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             updateQualityReadout()
             when (checkedId) {
                 R.id.rbInternal -> {
-                    cameraSource = CameraSource.INTERNAL
+                    camera.activeType = CameraSourceType.INTERNAL
                     b.wifiGroup.visibility = View.GONE
-                    stopWifiCamera()
-                    stopUsbCamera()
-                    startCamera()
+                    camera.wifi.stop()
+                    camera.usb.stop()
+                    startInternalCamera()
                 }
                 R.id.rbWifi -> {
-                    cameraSource = CameraSource.WIFI
+                    camera.activeType = CameraSourceType.WIFI
                     b.wifiGroup.visibility = View.VISIBLE
-                    stopCamera()
-                    stopUsbCamera()
+                    camera.internal.stop()
+                    camera.usb.stop()
                 }
                 R.id.rbUsb -> {
-                    cameraSource = CameraSource.USB
+                    camera.activeType = CameraSourceType.USB
                     b.wifiGroup.visibility = View.GONE
-                    stopCamera()
-                    stopWifiCamera()
+                    camera.internal.stop()
+                    camera.wifi.stop()
                     startUsbCamera()
                 }
             }
@@ -272,9 +156,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             simulate = checked
             coordinateMapper.invalidate()
             if (simulate) {
-                stopCamera()
-                stopWifiCamera()
-                stopUsbCamera()
+                camera.stopAll()
                 b.overlay.clearPoints()
                 b.overlay.hideSimDot()
                 b.previewView.visibility = View.INVISIBLE
@@ -284,15 +166,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 b.previewView.visibility = View.VISIBLE
                 b.overlay.hideSimDot()
                 b.overlay.clearPoints()
-                when (cameraSource) {
-                    CameraSource.INTERNAL -> startCamera()
-                    CameraSource.WIFI -> {
+                when (camera.activeType) {
+                    CameraSourceType.INTERNAL -> startInternalCamera()
+                    CameraSourceType.WIFI -> {
                         val url = b.edWifiUrl.text.toString()
                         if (url.isNotEmpty()) {
                             startWifiCamera(url)
                         }
                     }
-                    CameraSource.USB -> startUsbCamera()
+                    CameraSourceType.USB -> startUsbCamera()
                 }
             }
         }
@@ -343,23 +225,21 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         b.btnLock.setOnClickListener {
             isLocked = !isLocked
             b.btnLock.text = if (isLocked) getString(R.string.unlock) else getString(R.string.lock)
-            
+
             if (isLocked) {
                  // Trigger Lock
-                 if (cameraSource == CameraSource.USB) {
-                     val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
-                     val lockedThr = frag?.lockTarget(true) ?: return@setOnClickListener
+                 if (camera.activeType == CameraSourceType.USB) {
+                     val lockedThr = camera.usb.lockTarget(true) ?: return@setOnClickListener
                      Toast.makeText(this, "Locked (USB) Thr=$lockedThr", Toast.LENGTH_SHORT).show()
-                 } else if (cameraSource == CameraSource.INTERNAL) {
-                     lockRequest = true // Signal analyzer to lock on next frame
+                 } else if (camera.activeType == CameraSourceType.INTERNAL) {
+                     camera.internal.requestLock() // Sampled on the next analyzed frame
                  }
             } else {
                 // Unlock
-                lockRequest = false
+                camera.internal.cancelLockRequest()
                 updateCfg { copy(lockedThreshold = null) }
-                if (cameraSource == CameraSource.USB) {
-                     val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
-                     frag?.lockTarget(false)
+                if (camera.activeType == CameraSourceType.USB) {
+                     camera.usb.lockTarget(false)
                 }
                 Toast.makeText(this, "Unlocked", Toast.LENGTH_SHORT).show()
             }
@@ -410,8 +290,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 updatingTargetRadiusField = false
             }
             updateParamsSummary()
-            val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
-            frag?.setTargetCircle(tx, ty, radius)
+            camera.usb.setTargetCircle(tx, ty, radius)
         }
         b.edTargetRadius.setText(String.format(Locale.US, "%.1f", cfg.targetRadiusPx))
         b.edTargetRadius.setOnEditorActionListener { v, _, _ ->
@@ -495,7 +374,104 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
         }
 
-        if (!simulate) ensureCameraPermission { startCamera() }
+        if (!simulate) ensureCameraPermission { startInternalCamera() }
+    }
+
+    /** Wires the three camera sources to this activity's shared detection state and UI. */
+    private fun buildCameraController(): CameraController {
+        val internalSource = InternalCameraSource(
+            this, b.previewView, frameAnalyzer,
+            object : InternalCameraSource.Listener {
+                override fun isAnalysisEnabled() = autoDetect && !simulate
+                override fun isTrackingEnabled() = trackingEnabled
+                override fun onToolPointDetected(point: FrameAnalyzer.ViewPoint) {
+                    this@MainActivity.onToolPointDetected(point.x, point.y, point.quality)
+                }
+                override fun onLockThresholdSampled(threshold: Int) {
+                    updateCfg { copy(lockedThreshold = threshold) }
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Locked (Int) Thr=$threshold", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        )
+
+        val wifiSource = WifiCameraSource(
+            this, b.textureView, frameAnalyzer,
+            object : WifiCameraSource.Listener {
+                override fun isAnalysisEnabled() = autoDetect
+                override fun isTrackingEnabled() = trackingEnabled
+                override fun onToolPointDetected(point: FrameAnalyzer.ViewPoint) {
+                    this@MainActivity.onToolPointDetected(point.x, point.y, point.quality)
+                }
+                override fun onError(message: String) {
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+                }
+            }
+        )
+
+        val usbController = UsbCameraController(
+            this, b.usbCameraContainer, R.id.usbCameraContainer,
+            object : UsbCameraController.Host {
+                override val isActiveSource: Boolean
+                    get() = camera.activeType == CameraSourceType.USB && !simulate
+
+                override fun configureFragment(fragment: UvcFragment) {
+                    fragment.setTargetCircle(
+                        x = b.overlay.targetX,
+                        y = b.overlay.targetY,
+                        radiusPx = b.overlay.targetRadiusPx
+                    )
+                    fragment.setDetectorTuning(cfg.minCircularity, cfg.kStd, cfg.minContrastRatio)
+                    fragment.setDetectionCallback(object : UvcFragment.DetectionCallback {
+                        override fun onPointDetected(x: Float, y: Float, circularity: Double, contrastRatio: Double, sharpness: Double) {
+                            if (autoDetect && !simulate && trackingEnabled) {
+                                onToolPointDetected(x, y, DetectionQuality(circularity, contrastRatio, sharpness))
+                            }
+                        }
+                    })
+                }
+
+                override fun showToast(message: String) {
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+                }
+
+                override fun showRetriesExhausted(retry: () -> Unit) {
+                    com.google.android.material.snackbar.Snackbar.make(
+                        b.root,
+                        "USB camera could not reconnect. Replug it, or tap Retry.",
+                        com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE
+                    ).setAction("Retry") { retry() }.show()
+                }
+
+                override fun onStopped() {
+                    if (camera.activeType == CameraSourceType.INTERNAL) {
+                        b.previewView.visibility = View.VISIBLE
+                    }
+                }
+            }
+        )
+
+        return CameraController(internalSource, wifiSource, usbController)
+    }
+
+    private fun startInternalCamera() {
+        b.previewView.visibility = View.VISIBLE
+        b.textureView.visibility = View.GONE
+        camera.internal.start()
+    }
+
+    private fun startWifiCamera(url: String) {
+        if (camera.wifi.start(url)) {
+            b.previewView.visibility = View.GONE
+            b.textureView.visibility = View.VISIBLE
+        }
+    }
+
+    private fun startUsbCamera() {
+        b.previewView.visibility = View.GONE
+        b.textureView.visibility = View.GONE
+        camera.usb.start()
     }
 
     private fun startCenterCalibration() {
@@ -1016,11 +992,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
-    /** USB frames are detected in [com.etrsystems.axisight.ui.UvcFragment]'s own detector
+    /** USB frames are detected in [UvcFragment]'s own detector
      *  config, independent of [cfg] — push tuning-slider changes there too when USB is live. */
     private fun syncUsbDetectorTuning() {
-        val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
-        frag?.setDetectorTuning(cfg.minCircularity, cfg.kStd, cfg.minContrastRatio)
+        camera.usb.setDetectorTuning(cfg.minCircularity, cfg.kStd, cfg.minContrastRatio)
     }
 
     private fun updateParamsSummary() {
@@ -1135,7 +1110,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     AlignmentRecord(
                         timestampMs = System.currentTimeMillis(),
                         toolLabel = label,
-                        cameraSource = cameraSource.name,
+                        cameraSource = camera.activeType.name,
                         dxIn = delta.first,
                         dyIn = delta.second,
                         fitRmsPx = b.overlay.lastFitResult?.rms
@@ -1170,410 +1145,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        stopCamera()
-        stopWifiCamera()
-        stopUsbCamera()
-        unregisterUsbPermissionReceiverIfNeeded()
-        unregisterUsbMonitorRecoveryReceiverIfNeeded()
-        unregisterUsbAttachReceiverIfNeeded()
-        pendingUsbRetryRunnable?.let { mainHandler.removeCallbacks(it) }
-        analysisExecutor.shutdown()
+        if (::camera.isInitialized) camera.dispose()
     }
 
     private fun ensureCameraPermission(onGranted: () -> Unit) {
         val cam = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         if (cam) onGranted()
         else camPerm.launch(arrayOf(Manifest.permission.CAMERA))
-    }
-
-    private fun startCamera() {
-        b.previewView.visibility = View.VISIBLE
-        b.textureView.visibility = View.GONE
-        try {
-            val providerFuture = ProcessCameraProvider.getInstance(this)
-            providerFuture.addListener({
-                try {
-                    cameraProvider = providerFuture.get()
-                    bindUseCases()
-                } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "Camera initialization failed: ${e.message}", Toast.LENGTH_LONG).show()
-                    android.util.Log.e("MainActivity", "Failed to get camera provider", e)
-                }
-            }, ContextCompat.getMainExecutor(this))
-        } catch (e: Exception) {
-            Toast.makeText(this, "Camera setup error: ${e.message}", Toast.LENGTH_LONG).show()
-            android.util.Log.e("MainActivity", "startCamera failed", e)
-        }
-    }
-
-    private fun stopCamera() {
-        cameraProvider?.unbindAll()
-        imageAnalyzer = null
-    }
-
-    private fun bindUseCases() {
-        val provider = cameraProvider ?: return
-        try {
-            provider.unbindAll()
-
-            val preview = Preview.Builder().build().apply {
-                setSurfaceProvider(b.previewView.surfaceProvider)
-            }
-
-            imageAnalyzer = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also { analysis ->
-                    analysis.setAnalyzer(analysisExecutor) { image ->
-                        try {
-                            if (autoDetect && !simulate && cameraSource == CameraSource.INTERNAL) {
-                                // Manual Lock Request
-                                if (lockRequest) {
-                                    lockRequest = false
-                                    // Sample center pixel from ImageProxy (YUV_420_888)
-                                    // Y plane is first. Use duplicate() to avoid mutating the
-                                    // shared buffer position before passing to BlobDetector.
-                                    val yPlane = image.planes[0].buffer.duplicate()
-                                    val w = image.width
-                                    val h = image.height
-                                    val cx = w / 2
-                                    val cy = h / 2
-                                    val rowStride = image.planes[0].rowStride
-                                    val pixelStride = image.planes[0].pixelStride
-                                    val offset = (cy * rowStride) + (cx * pixelStride)
-                                    if (offset < yPlane.remaining()) {
-                                        yPlane.position(offset)
-                                        val lum = yPlane.get().toInt() and 0xFF
-                                        val margin = 30
-                                        val thr = (lum + margin).coerceIn(0, 255)
-                                        updateCfg { copy(lockedThreshold = thr) }
-                                        runOnUiThread {
-                                            Toast.makeText(this@MainActivity, "Locked (Int) Thr=$thr", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                }
-
-                                val snapshot = cfg
-                                val raw = BlobDetector.detectDarkDotCenter(image, snapshot)
-                                val result = detectionFilter.filter(raw, snapshot)
-                                if (result is DetectionResult.Success && trackingEnabled) {
-                                    val previewW = b.previewView.width
-                                    val previewH = b.previewView.height
-                                    coordinateMapper.update(
-                                        image.width, image.height,
-                                        image.imageInfo.rotationDegrees,
-                                        previewW, previewH
-                                    )
-                                    val (vx, vy) = coordinateMapper.imageToView(result.x, result.y)
-                                    val quality = DetectionQuality(result.circularity, result.contrastRatio, result.sharpness)
-                                    runOnUiThread { onToolPointDetected(vx, vy, quality) }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.e("MainActivity", "Image analysis failed", e)
-                        } finally {
-                            image.close()
-                        }
-                    }
-                }
-
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-            provider.bindToLifecycle(this, cameraSelector, preview, imageAnalyzer)
-        } catch (e: Exception) {
-            Toast.makeText(this, "Camera binding failed: ${e.message}", Toast.LENGTH_LONG).show()
-            android.util.Log.e("MainActivity", "bindUseCases failed", e)
-        }
-    }
-
-    @UnstableApi
-    private fun startWifiCamera(url: String) {
-        try {
-            // Validate URL format
-            if (!isValidRtspUrl(url)) {
-                Toast.makeText(this, "Invalid RTSP URL. Expected format: rtsp://...", Toast.LENGTH_LONG).show()
-                return
-            }
-
-            b.previewView.visibility = View.GONE
-            b.textureView.visibility = View.VISIBLE
-            b.textureView.surfaceTextureListener = this
-
-            stopWifiCamera() // Clean up any existing player
-
-            exoPlayer = ExoPlayer.Builder(this).build()
-            b.textureView.surfaceTexture?.let {
-                exoPlayer?.setVideoSurface(Surface(it))
-            }
-
-            val mediaSource = RtspMediaSource.Factory().createMediaSource(MediaItem.fromUri(url))
-            exoPlayer?.setMediaSource(mediaSource)
-            exoPlayer?.prepare()
-            exoPlayer?.play()
-        } catch (e: Exception) {
-            Toast.makeText(this, "WiFi camera error: ${e.message}", Toast.LENGTH_LONG).show()
-            android.util.Log.e("MainActivity", "WiFi camera start failed", e)
-            stopWifiCamera()
-        }
-    }
-
-    /**
-     * Validates RTSP URL format to prevent injection/malformed URLs
-     */
-    private fun isValidRtspUrl(url: String): Boolean {
-        return try {
-            val uri = android.net.Uri.parse(url)
-            val scheme = uri.scheme?.lowercase() ?: return false
-            scheme in listOf("rtsp", "rtsps") && uri.host != null
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun stopWifiCamera() {
-        try {
-            exoPlayer?.run {
-                clearVideoSurface()
-                stop()
-                release()
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Error stopping WiFi camera", e)
-        } finally {
-            exoPlayer = null
-        }
-    }
-
-    private fun startUsbCamera() {
-        try {
-            b.previewView.visibility = View.GONE
-            b.textureView.visibility = View.GONE
-            b.usbCameraContainer.visibility = View.VISIBLE
-
-            val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
-            val uvcDevice = usbManager.deviceList.values.firstOrNull { isUvcDevice(it) }
-            if (uvcDevice == null) {
-                b.usbCameraContainer.visibility = View.GONE
-                Toast.makeText(this, "No USB camera detected.", Toast.LENGTH_LONG).show()
-                return
-            }
-
-            if (!usbManager.hasPermission(uvcDevice)) {
-                if (usbPermissionRequestInFlight) {
-                    return
-                }
-                val now = SystemClock.elapsedRealtime()
-                if (now - lastUsbPermissionRequestMs < USB_PERMISSION_RETRY_COOLDOWN_MS) {
-                    return
-                }
-                b.usbCameraContainer.visibility = View.GONE
-                usbPermissionRequestInFlight = true
-                lastUsbPermissionRequestMs = now
-                requestUsbPermission(usbManager, uvcDevice)
-                Toast.makeText(this, "Grant USB permission to continue.", Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            usbPermissionRequestInFlight = false
-            showUsbCameraFragment(uvcDevice)
-        } catch (e: Exception) {
-            usbPermissionRequestInFlight = false
-            Toast.makeText(this, "USB camera error: ${e.message}", Toast.LENGTH_LONG).show()
-            android.util.Log.e("MainActivity", "USB camera start failed", e)
-            stopUsbCamera()
-        }
-    }
-
-    private fun openPermittedUsbCamera(preferredDevice: UsbDevice?): Boolean {
-        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
-        val chosen = sequenceOf(preferredDevice)
-            .filterNotNull()
-            .firstOrNull { isUvcDevice(it) && usbManager.hasPermission(it) }
-            ?: usbManager.deviceList.values.firstOrNull { isUvcDevice(it) && usbManager.hasPermission(it) }
-
-        if (chosen == null) {
-            return false
-        }
-        showUsbCameraFragment(chosen)
-        return true
-    }
-
-    private fun showUsbCameraFragment(device: UsbDevice) {
-        b.previewView.visibility = View.GONE
-        b.textureView.visibility = View.GONE
-        b.usbCameraContainer.visibility = View.VISIBLE
-
-        val uvcFragment = com.etrsystems.axisight.ui.UvcFragment.newInstance(
-            vendorId = device.vendorId,
-            productId = device.productId,
-            deviceName = device.deviceName
-        )
-        uvcFragment.setTargetCircle(
-            x = b.overlay.targetX,
-            y = b.overlay.targetY,
-            radiusPx = b.overlay.targetRadiusPx
-        )
-        uvcFragment.setDetectorTuning(cfg.minCircularity, cfg.kStd, cfg.minContrastRatio)
-        uvcFragment.setDetectionCallback(object : com.etrsystems.axisight.ui.UvcFragment.DetectionCallback {
-            override fun onPointDetected(x: Float, y: Float, circularity: Double, contrastRatio: Double, sharpness: Double) {
-                if (autoDetect && !simulate && trackingEnabled) {
-                    onToolPointDetected(x, y, DetectionQuality(circularity, contrastRatio, sharpness))
-                }
-            }
-        })
-        usbFragmentRetryCount = 0
-        uvcFragment.setCameraStateListener(object : com.etrsystems.axisight.ui.UvcFragment.CameraStateListener {
-            override fun onUsbCameraOpened() {
-                usbFragmentRetryCount = 0
-                Log.i(TAG, "USB camera opened in MainActivity")
-            }
-            override fun onUsbCameraClosed() {
-                Log.w(TAG, "USB camera closed in MainActivity (retry $usbFragmentRetryCount)")
-                scheduleUsbFragmentRetry("camera closed")
-            }
-            override fun onUsbCameraError(message: String?) {
-                Log.e(TAG, "USB camera error in MainActivity: $message (retry $usbFragmentRetryCount)")
-                scheduleUsbFragmentRetry("camera error: $message")
-            }
-        })
-
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.usbCameraContainer, uvcFragment)
-            .commit()
-    }
-
-    private fun requestUsbPermission(usbManager: UsbManager, device: UsbDevice) {
-        registerUsbPermissionReceiverIfNeeded()
-        pendingUsbDeviceName = device.deviceName
-
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        val permissionIntent = PendingIntent.getBroadcast(
-            this,
-            1001,
-            Intent(usbPermissionAction).setPackage(packageName),
-            flags
-        )
-        usbManager.requestPermission(device, permissionIntent)
-    }
-
-    private fun registerUsbPermissionReceiverIfNeeded() {
-        if (usbPermissionReceiverRegistered) return
-        val filter = IntentFilter(usbPermissionAction)
-        ContextCompat.registerReceiver(
-            this, usbPermissionReceiver, filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        usbPermissionReceiverRegistered = true
-    }
-
-    private fun registerUsbMonitorRecoveryReceiverIfNeeded() {
-        if (usbRecoveryReceiverRegistered) return
-        val filter = IntentFilter(AxisightApp.ACTION_USB_MONITOR_RACE)
-        androidx.core.content.ContextCompat.registerReceiver(
-            this, usbMonitorRecoveryReceiver, filter,
-            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        usbRecoveryReceiverRegistered = true
-    }
-
-    private fun registerUsbAttachReceiverIfNeeded() {
-        if (usbAttachReceiverRegistered) return
-        val filter = IntentFilter().apply {
-            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
-            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
-        }
-        ContextCompat.registerReceiver(
-            this, usbAttachReceiver, filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        usbAttachReceiverRegistered = true
-    }
-
-    private fun unregisterUsbPermissionReceiverIfNeeded() {
-        if (!usbPermissionReceiverRegistered) return
-        try {
-            unregisterReceiver(usbPermissionReceiver)
-        } catch (_: IllegalArgumentException) {
-            // Receiver may already be unregistered by lifecycle races.
-        } finally {
-            usbPermissionReceiverRegistered = false
-            pendingUsbDeviceName = null
-        }
-    }
-
-    private fun unregisterUsbMonitorRecoveryReceiverIfNeeded() {
-        if (!usbRecoveryReceiverRegistered) return
-        try {
-            unregisterReceiver(usbMonitorRecoveryReceiver)
-        } catch (_: IllegalArgumentException) {
-            // Receiver may already be unregistered by lifecycle races.
-        } finally {
-            usbRecoveryReceiverRegistered = false
-        }
-    }
-
-    private fun unregisterUsbAttachReceiverIfNeeded() {
-        if (!usbAttachReceiverRegistered) return
-        try {
-            unregisterReceiver(usbAttachReceiver)
-        } catch (_: IllegalArgumentException) {
-            // Receiver may already be unregistered by lifecycle races.
-        } finally {
-            usbAttachReceiverRegistered = false
-        }
-    }
-
-    private fun getUsbDeviceExtra(intent: Intent): UsbDevice? =
-        UsbDeviceUtils.getUsbDeviceExtra(intent)
-
-    private fun isUvcDevice(device: UsbDevice): Boolean =
-        UsbDeviceUtils.isUvcDevice(device)
-
-    private fun stopUsbCamera() {
-        try {
-            usbPermissionRequestInFlight = false
-            pendingUsbDeviceName = null
-            b.usbCameraContainer.visibility = View.GONE
-            val currentFrag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer)
-            if (currentFrag != null) {
-                 supportFragmentManager.beginTransaction()
-                    .remove(currentFrag)
-                    .commitAllowingStateLoss()
-            }
-            if (cameraSource == CameraSource.INTERNAL) {
-                 b.previewView.visibility = View.VISIBLE
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Error stopping USB camera", e)
-        }
-    }
-
-
-    private fun scheduleUsbFragmentRetry(reason: String) {
-        if (isFinishing || isDestroyed) return
-        if (cameraSource != CameraSource.USB || simulate) return
-        if (usbFragmentRetryCount >= MAX_USB_FRAGMENT_RETRIES) {
-            Log.e(TAG, "USB fragment retries exhausted in MainActivity. reason=$reason")
-            usbFragmentRetryCount = 0
-            com.google.android.material.snackbar.Snackbar.make(
-                b.root,
-                "USB camera could not reconnect. Replug it, or tap Retry.",
-                com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE
-            ).setAction("Retry") {
-                if (cameraSource == CameraSource.USB && !simulate) startUsbCamera()
-            }.show()
-            return
-        }
-        usbFragmentRetryCount++
-        val delay = (USB_RECONNECT_DELAY_MS * usbFragmentRetryCount).coerceAtMost(4000L)
-        val runnable = Runnable {
-            pendingUsbRetryRunnable = null
-            if (cameraSource == CameraSource.USB && !simulate && !isFinishing && !isDestroyed) {
-                startUsbCamera()
-            }
-        }
-        pendingUsbRetryRunnable = runnable
-        mainHandler.postDelayed(runnable, delay)
     }
 
     private val simTick = object : Runnable {
@@ -1597,41 +1175,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
-    override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-        exoPlayer?.setVideoSurface(Surface(surface))
-    }
-
-    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
-
-    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-        exoPlayer?.clearVideoSurface()
-        return true
-    }
-
-    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
-        try {
-            if (cameraSource == CameraSource.WIFI && autoDetect) {
-                val bmp = b.textureView.bitmap ?: return
-                try {
-                    // ExoPlayer renders to textureView without additional rotation
-                    coordinateMapper.update(bmp.width, bmp.height, 0, b.textureView.width, b.textureView.height)
-                    val snapshot = cfg
-                    val raw = BlobDetector.detectDarkDotCenter(bmp, snapshot)
-                    val result = detectionFilter.filter(raw, snapshot)
-                    if (result is DetectionResult.Success && trackingEnabled) {
-                        val (vx, vy) = coordinateMapper.imageToView(result.x, result.y)
-                        val quality = DetectionQuality(result.circularity, result.contrastRatio, result.sharpness)
-                        onToolPointDetected(vx, vy, quality)
-                    }
-                } finally {
-                    bmp.recycle()
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Texture frame analysis failed", e)
-        }
-    }
-
     private fun updateTrackingButtons() {
         b.btnTrackStart.isEnabled = !trackingEnabled
         b.btnTrackStop.isEnabled = trackingEnabled
@@ -1644,10 +1187,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     companion object {
-        private const val TAG = "MainActivity"
-        private const val USB_RECONNECT_DELAY_MS = 600L
-        private const val USB_PERMISSION_RETRY_COOLDOWN_MS = 1500L
-        private const val MAX_USB_FRAGMENT_RETRIES = 6
         private const val MIN_UP_DISTANCE_PX = 40.0
         private const val MIN_SCALE_DISTANCE_PX = 80.0
         private const val MAX_COMBINED_ERROR_IN = 0.020
