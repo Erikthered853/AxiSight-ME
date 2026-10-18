@@ -1,10 +1,7 @@
 <resources>
     <string name="app_name">AxiSight</string>
-    <string name="controls_title">Camera and Capture Controls</string>
     <string name="sim">Simulate</string>
     <string name="auto">Auto-Detect</string>
-    <string name="calibrate">Cal Wizard</string>
-    <string name="export_csv">Export CSV</string>
     <string name="lock">Lock</string>
     <string name="unlock">Unlock</string>
     <string name="track_start">Start</string>
@@ -15,8 +12,6 @@
     <string name="wifi">WiFi</string>
     <string name="wifi_url_hint">rtsp://</string>
     <string name="connect">Connect</string>
-    <string name="label_min_area">Minimum Area</string>
-    <string name="label_max_area">Maximum Area</string>
     <string name="label_target_radius">Target Radius (px)</string>
     <string name="hint_target_radius">e.g. 120</string>
     <string name="label_circularity">Minimum Circularity</string>
@@ -40,7 +35,6 @@
     <string name="quality_sharp_segment">Sharp %1$.0f</string>
     <string name="quality_signal_segment">Signal %1$.0f%%</string>
     <string name="calibration_step_center">Set Center: tap the true center reference point.</string>
-    <string name="calibration_step_up">Calibration step 2/3: tap point in +Y (up) direction.</string>
     <string name="calibration_step_scale_up">Scale Setup 1/3: tap a point in the +Y (up) direction.</string>
     <string name="calibration_step_scale_1">Scale Setup 2/3: tap first reference point.</string>
     <string name="calibration_step_scale_2">Scale Setup 3/3: tap second reference point (0.1181\" apart).</string>
@@ -93,8 +87,6 @@
     <string name="alignment_log_saved">Logged alignment for \"%1$s\".</string>
     <string name="alignment_log_empty">No alignment history yet.</string>
     <string name="alignment_log_export_path">%1$d records in %2$s</string>
-    <string name="sign_out">Sign Out</string>
-    <string name="btn_sign_out_desc">Sign out of AxiSight</string>
     <!-- Replace with the Web client ID from Firebase Console > Authentication > Sign-in method > Google > Web client ID -->
     <string name="default_web_client_id">REPLACE_WITH_FIREBASE_WEB_CLIENT_ID</string>
 </resources>

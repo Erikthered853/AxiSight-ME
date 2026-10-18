@@ -226,3 +226,11 @@ __marimo__/
 latest_logs.txt
 
 build_log*.txt
+
+# Device debugging captures — keep out of the repo
+*.logcat
+*_dump*.txt
+*_dump*.xml
+usb_*.txt
+usb_*.xml
+window_dump*.xml
