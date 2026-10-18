@@ -102,7 +102,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private var simAngle = 0.0
     private var simRadiusPx = 200f
-    private var zoomFactor = 1f
+    private var zoomFactor = ZOOM_1X
 
     private var isResizingTarget = false
     private var touchDownX = 0f
@@ -234,7 +234,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             latestDetectionQuality = null
             detectionFilter.reset()
             coordinateMapper.invalidate()
-            applyZoom(1f)
+            applyZoom(ZOOM_1X)
             updateDeltaReadout()
             updateQualityReadout()
             when (checkedId) {
@@ -336,9 +336,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             popup.show()
         }
 
-        b.btnZoom1x.setOnClickListener { applyZoom(1f) }
-        b.btnZoom2x.setOnClickListener { applyZoom(2f) }
-        b.btnZoom5x.setOnClickListener { applyZoom(5f) }
+        b.zoomGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) applyZoom(zoomFactorFor(checkedId))
+        }
 
         b.btnLock.setOnClickListener {
             isLocked = !isLocked
@@ -1006,8 +1006,23 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
      * view's own unscaled local space, so calibration taps, target-circle dragging, and
      * detection math all keep working unmodified regardless of zoom level.
      */
+    private fun zoomFactorFor(buttonId: Int): Float = when (buttonId) {
+        R.id.btnZoom2x -> ZOOM_2X
+        R.id.btnZoom5x -> ZOOM_5X
+        else -> ZOOM_1X
+    }
+
+    private fun zoomButtonFor(factor: Float): Int = when (factor) {
+        ZOOM_2X -> R.id.btnZoom2x
+        ZOOM_5X -> R.id.btnZoom5x
+        else -> R.id.btnZoom1x
+    }
+
     private fun applyZoom(factor: Float) {
         zoomFactor = factor
+        // Keep the toggle in sync when zoom is reset programmatically (e.g. on source switch).
+        val wanted = zoomButtonFor(factor)
+        if (b.zoomGroup.checkedButtonId != wanted) b.zoomGroup.check(wanted)
         for (v in listOf(b.previewView, b.textureView, b.usbCameraContainer, b.overlay)) {
             v.pivotX = v.width / 2f
             v.pivotY = v.height / 2f
@@ -1645,6 +1660,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     companion object {
         private const val TAG = "MainActivity"
+        private const val ZOOM_1X = 1f
+        private const val ZOOM_2X = 2f
+        private const val ZOOM_5X = 5f
         private const val USB_RECONNECT_DELAY_MS = 600L
         private const val USB_PERMISSION_RETRY_COOLDOWN_MS = 1500L
         private const val MAX_USB_FRAGMENT_RETRIES = 6

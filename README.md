@@ -135,7 +135,7 @@ Calibration data (center, up-vector, in/px scale) is persisted in `SharedPrefere
 
 ## Digital Zoom
 
-`1x`/`2x`/`5x` buttons (top-right) apply a pivot-centered `scaleX`/`scaleY` transform to the active preview view and the overlay together, so the crosshair/target/points stay pixel-aligned with the zoomed image. This is purely a rendering transform — Android delivers touch events to a scaled view in that view's own unscaled local coordinates, so calibration taps, target-circle dragging, and all detection math are unaffected by zoom level. Zoom resets to 1x on camera-source switch.
+The `1x`/`2x`/`5x` segmented toggle (top-right, active level highlighted) applies a pivot-centered `scaleX`/`scaleY` transform to the active preview view and the overlay together, so the crosshair/target/points stay pixel-aligned with the zoomed image. This is purely a rendering transform — Android delivers touch events to a scaled view in that view's own unscaled local coordinates, so calibration taps, target-circle dragging, and all detection math are unaffected by zoom level. Zoom resets to 1x on camera-source switch.
 
 ---
 
@@ -204,5 +204,5 @@ All 42 run under Robolectric with `./gradlew testDebugUnitTest`; no device neede
 - **CalibrationData** is stored in camera image-space pixels (converted via `CoordinateMapper`) for the Internal and WiFi camera sources, so it survives screen resolution/orientation changes on those sources. The **USB (UVC)** source does not yet feed `CoordinateMapper` — its detection callback reports pre-offset coordinates directly — so calibration captured while on USB is still effectively view-space and should be redone if the screen resolution changes
 - **Google Sign-In** requires a real `default_web_client_id` from Firebase Console (placeholder ships in the repo)
 - **USB camera** tested on UVC-class cameras (e.g. Teslong borescopes); non-UVC USB cameras are ignored
-- **Zoom buttons** (`1x`/`2x`/`5x`) render without visible labels on some devices; functionality is unaffected
+- **16 KB page size** — the AUSBC/libuvc native libraries are not 16 KB aligned, so Android 15+/16 shows a one-time "App Compatibility" warning on *debuggable* builds. Release builds are unaffected until Google enforces alignment; a fix needs rebuilt upstream `.so` files
 - **Google Sign-In** uses the deprecated `GoogleSignIn` API (compiler warnings); migrate to Credential Manager if auth is re-enabled

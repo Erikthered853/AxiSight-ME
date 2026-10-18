@@ -122,62 +122,39 @@
         <!-- ═══════════════════════════════════════════
              ZOOM PANEL — digital zoom on the preview + overlay
              ═══════════════════════════════════════════ -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/zoomPanel"
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/zoomGroup"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:layout_marginEnd="6dp"
-            app:cardBackgroundColor="@color/axisight_scrim"
-            app:cardCornerRadius="10dp"
-            app:cardElevation="0dp"
+            app:checkedButton="@id/btnZoom1x"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@id/topStrip"
-            app:strokeColor="@color/axisight_orbit"
-            app:strokeWidth="1dp">
+            app:selectionRequired="true"
+            app:singleSelection="true">
 
-            <LinearLayout
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnZoom1x"
+                style="@style/Widget.AxiSight.Button.Zoom"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="4dp">
+                android:text="@string/zoom_1x" />
 
-                <Button
-                    android:id="@+id/btnZoom1x"
-                    style="@style/Widget.AxiSight.Button.Tonal"
-                    android:layout_width="44dp"
-                    android:layout_height="36dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="0dp"
-                    android:paddingEnd="0dp"
-                    android:text="@string/zoom_1x"
-                    android:textSize="12sp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnZoom2x"
+                style="@style/Widget.AxiSight.Button.Zoom"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/zoom_2x" />
 
-                <Button
-                    android:id="@+id/btnZoom2x"
-                    style="@style/Widget.AxiSight.Button.Tonal"
-                    android:layout_width="44dp"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="4dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="0dp"
-                    android:paddingEnd="0dp"
-                    android:text="@string/zoom_2x"
-                    android:textSize="12sp" />
-
-                <Button
-                    android:id="@+id/btnZoom5x"
-                    style="@style/Widget.AxiSight.Button.Tonal"
-                    android:layout_width="44dp"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="4dp"
-                    android:minWidth="0dp"
-                    android:paddingStart="0dp"
-                    android:paddingEnd="0dp"
-                    android:text="@string/zoom_5x"
-                    android:textSize="12sp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnZoom5x"
+                style="@style/Widget.AxiSight.Button.Zoom"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/zoom_5x" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <!-- ═══════════════════════════════════════════
              WIFI ROW — shown only when WiFi source selected
@@ -702,66 +679,57 @@
 
             <Button
                 android:id="@+id/btnCal"
-                style="@style/Widget.AxiSight.Button.Tonal"
+                style="@style/Widget.AxiSight.Button.Tonal.Compact"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:maxLines="1"
-                android:text="@string/cal_short"
-                android:textSize="11sp" />
+                android:text="@string/cal_short" />
 
             <Button
                 android:id="@+id/btnTrackStart"
+                style="@style/Widget.AxiSight.Button.Compact"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:maxLines="1"
-                android:text="@string/track_start"
-                android:textSize="11sp" />
+                android:text="@string/track_start" />
 
             <Button
                 android:id="@+id/btnTrackStop"
+                style="@style/Widget.AxiSight.Button.Compact"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:backgroundTint="@color/axisight_warn"
-                android:maxLines="1"
-                android:text="@string/track_stop"
-                android:textSize="11sp" />
+                android:text="@string/track_stop" />
 
             <Button
                 android:id="@+id/btnTrackReset"
-                style="@style/Widget.AxiSight.Button.Tonal"
+                style="@style/Widget.AxiSight.Button.Tonal.Compact"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:maxLines="1"
-                android:text="@string/track_reset"
-                android:textSize="11sp" />
+                android:text="@string/track_reset" />
 
             <Button
                 android:id="@+id/btnLock"
+                style="@style/Widget.AxiSight.Button.Compact"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:maxLines="1"
-                android:text="@string/lock"
-                android:textSize="11sp" />
+                android:text="@string/lock" />
 
             <Button
                 android:id="@+id/btnExport"
-                style="@style/Widget.AxiSight.Button.Tonal"
+                style="@style/Widget.AxiSight.Button.Tonal.Compact"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_weight="1"
-                android:maxLines="1"
-                android:text="@string/csv_short"
-                android:textSize="11sp" />
+                android:text="@string/csv_short" />
         </LinearLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
