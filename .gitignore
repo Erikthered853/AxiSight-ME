@@ -226,3 +226,6 @@ __marimo__/
 latest_logs.txt
 
 build_log*.txt
+
+# skill-seekers generated skill output
+output/

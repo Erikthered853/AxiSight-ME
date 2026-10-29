@@ -1,0 +1,3475 @@
+{
+  "total_files": 37,
+  "categories": {
+    "overview": [
+      "CALIBRATION_GUIDE.md",
+      "CLAUDE_EXECUTION_CHECKLIST.md",
+      "CLAUDE_HANDOFF_PROMPTS.md",
+      "CLAUDE_MASTER_HANDOFF_PROMPT.md",
+      "GEMINI.md",
+      "README.md"
+    ],
+    "api": [
+      "output\\AxiSight-ME-main\\api_reference\\AlignmentHistoryStore.md",
+      "output\\AxiSight-ME-main\\api_reference\\AlignmentHistoryStoreTest.md",
+      "output\\AxiSight-ME-main\\api_reference\\AuthManager.md",
+      "output\\AxiSight-ME-main\\api_reference\\AxisightApp.md",
+      "output\\AxiSight-ME-main\\api_reference\\BlobDetector.md",
+      "output\\AxiSight-ME-main\\api_reference\\BlobDetectorTest.md",
+      "output\\AxiSight-ME-main\\api_reference\\CalibrationData.md",
+      "output\\AxiSight-ME-main\\api_reference\\CalibrationQuality.md",
+      "output\\AxiSight-ME-main\\api_reference\\CalibrationQualityEvaluatorTest.md",
+      "output\\AxiSight-ME-main\\api_reference\\CalibrationStoreTest.md",
+      "output\\AxiSight-ME-main\\api_reference\\CalibrationViewModel.md",
+      "output\\AxiSight-ME-main\\api_reference\\CalibrationViewModelTest.md",
+      "output\\AxiSight-ME-main\\api_reference\\CameraController.md",
+      "output\\AxiSight-ME-main\\api_reference\\CameraSourceType.md",
+      "output\\AxiSight-ME-main\\api_reference\\CircleFit.md",
+      "output\\AxiSight-ME-main\\api_reference\\CircleFitTest.md",
+      "output\\AxiSight-ME-main\\api_reference\\CoordinateMapper.md",
+      "output\\AxiSight-ME-main\\api_reference\\CoordinateMapperTest.md",
+      "output\\AxiSight-ME-main\\api_reference\\CsvLogger.md",
+      "output\\AxiSight-ME-main\\api_reference\\DetectionFilter.md",
+      "output\\AxiSight-ME-main\\api_reference\\FrameAnalyzerTest.md",
+      "output\\AxiSight-ME-main\\api_reference\\InternalCameraSource.md",
+      "output\\AxiSight-ME-main\\api_reference\\LoginActivity.md",
+      "output\\AxiSight-ME-main\\api_reference\\MainActivity.md",
+      "output\\AxiSight-ME-main\\api_reference\\RotationFit.md",
+      "output\\AxiSight-ME-main\\api_reference\\RotationFitEvaluatorTest.md",
+      "output\\AxiSight-ME-main\\api_reference\\UsbCameraController.md",
+      "output\\AxiSight-ME-main\\api_reference\\UsbDeviceUtils.md",
+      "output\\AxiSight-ME-main\\api_reference\\UvcFragment.md",
+      "output\\AxiSight-ME-main\\api_reference\\WifiCameraSource.md"
+    ],
+    "other": [
+      "output\\AxiSight-ME-main\\config_patterns\\config_patterns.md"
+    ]
+  },
+  "files": [
+    {
+      "path": "CALIBRATION_GUIDE.md",
+      "filename": "CALIBRATION_GUIDE.md",
+      "category": "overview",
+      "size_bytes": 6939,
+      "title": "AxiSight Calibration Guide",
+      "structure": {
+        "title": "AxiSight Calibration Guide",
+        "headers": [
+          {
+            "level": 1,
+            "text": "AxiSight Calibration Guide",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Before you start",
+            "line": 15
+          },
+          {
+            "level": 2,
+            "text": "1. Set Center",
+            "line": 33
+          },
+          {
+            "level": 2,
+            "text": "2. Find Center by Rotation (most accurate)",
+            "line": 46
+          },
+          {
+            "level": 2,
+            "text": "3. Set Scale & Direction",
+            "line": 70
+          },
+          {
+            "level": 2,
+            "text": "Wizard controls",
+            "line": 97
+          },
+          {
+            "level": 2,
+            "text": "What is stored, and when to recalibrate",
+            "line": 105
+          },
+          {
+            "level": 2,
+            "text": "After calibrating",
+            "line": 119
+          },
+          {
+            "level": 2,
+            "text": "Troubleshooting",
+            "line": 127
+          }
+        ],
+        "code_blocks": [],
+        "tables": 5,
+        "images": 0,
+        "links": 0,
+        "word_count": 45,
+        "line_count": 138
+      },
+      "summary": "**AxiSight Calibration Guide**\nSections: Before you start, 1. Set Center, 2. Find Center by Rotation (most accurate), 3. Set Scale & Direction, Wizard controls\nAxiSight measures how far the detected tool tip sits from the spindle centerline and reports the offset in inches. For that it needs two calibrations:\n(45 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 5,
+        "cross_references": 1,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "CLAUDE_EXECUTION_CHECKLIST.md",
+      "filename": "CLAUDE_EXECUTION_CHECKLIST.md",
+      "category": "overview",
+      "size_bytes": 3184,
+      "title": "AxiSight-ME Claude Execution Checklist",
+      "structure": {
+        "title": "AxiSight-ME Claude Execution Checklist",
+        "headers": [
+          {
+            "level": 1,
+            "text": "AxiSight-ME Claude Execution Checklist",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Recommended execution order",
+            "line": 5
+          },
+          {
+            "level": 3,
+            "text": "Option 1: USB camera reliability first",
+            "line": 7
+          },
+          {
+            "level": 2,
+            "text": "Option 2: Overlay accuracy next",
+            "line": 33
+          },
+          {
+            "level": 2,
+            "text": "Option 3: Detection and centerline accuracy",
+            "line": 51
+          },
+          {
+            "level": 2,
+            "text": "Best overall handoff sequence",
+            "line": 69
+          },
+          {
+            "level": 2,
+            "text": "Handoff notes for whoever runs Claude",
+            "line": 87
+          },
+          {
+            "level": 2,
+            "text": "Related file",
+            "line": 96
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 44,
+        "line_count": 101
+      },
+      "summary": "**AxiSight-ME Claude Execution Checklist**\nSections: Recommended execution order, Option 1: USB camera reliability first, Option 2: Overlay accuracy next, Option 3: Detection and centerline accuracy, Best overall handoff sequence\nUse this file when handing the project to Claude so the work happens in a clean order.\n(44 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "CLAUDE_HANDOFF_PROMPTS.md",
+      "filename": "CLAUDE_HANDOFF_PROMPTS.md",
+      "category": "overview",
+      "size_bytes": 4628,
+      "title": "AxiSight-ME Claude Handoff Prompts",
+      "structure": {
+        "title": "AxiSight-ME Claude Handoff Prompts",
+        "headers": [
+          {
+            "level": 1,
+            "text": "AxiSight-ME Claude Handoff Prompts",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Full-app prompts",
+            "line": 13
+          },
+          {
+            "level": 3,
+            "text": "Calibration and workflow",
+            "line": 15
+          },
+          {
+            "level": 3,
+            "text": "Build and platform stability",
+            "line": 21
+          },
+          {
+            "level": 3,
+            "text": "Documentation",
+            "line": 27
+          },
+          {
+            "level": 2,
+            "text": "USB camera prompts",
+            "line": 31
+          },
+          {
+            "level": 3,
+            "text": "Planning",
+            "line": 33
+          },
+          {
+            "level": 3,
+            "text": "Implementation and debugging",
+            "line": 39
+          },
+          {
+            "level": 3,
+            "text": "Verification",
+            "line": 45
+          },
+          {
+            "level": 2,
+            "text": "Overlay UI prompts",
+            "line": 51
+          },
+          {
+            "level": 3,
+            "text": "Planning",
+            "line": 53
+          },
+          {
+            "level": 3,
+            "text": "Test-driven work",
+            "line": 59
+          },
+          {
+            "level": 3,
+            "text": "Review and verification",
+            "line": 65
+          },
+          {
+            "level": 2,
+            "text": "Alignment math prompts",
+            "line": 73
+          },
+          {
+            "level": 3,
+            "text": "Planning",
+            "line": 75
+          },
+          {
+            "level": 3,
+            "text": "Test-driven work",
+            "line": 81
+          },
+          {
+            "level": 3,
+            "text": "Verification",
+            "line": 87
+          },
+          {
+            "level": 2,
+            "text": "Suggested focused handoffs",
+            "line": 93
+          },
+          {
+            "level": 3,
+            "text": "USB camera reliability pass",
+            "line": 97
+          },
+          {
+            "level": 3,
+            "text": "Overlay accuracy pass",
+            "line": 101
+          },
+          {
+            "level": 3,
+            "text": "Detection accuracy pass",
+            "line": 105
+          },
+          {
+            "level": 2,
+            "text": "Final polish prompts",
+            "line": 109
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 57,
+        "line_count": 118
+      },
+      "summary": "**AxiSight-ME Claude Handoff Prompts**\nSections: Full-app prompts, Calibration and workflow, Build and platform stability, Documentation, USB camera prompts\nUse these inside Claude Code from the `AxiSight-ME` project root.\n(57 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "CLAUDE_MASTER_HANDOFF_PROMPT.md",
+      "filename": "CLAUDE_MASTER_HANDOFF_PROMPT.md",
+      "category": "overview",
+      "size_bytes": 3469,
+      "title": "AxiSight-ME Master Handoff Prompt",
+      "structure": {
+        "title": "AxiSight-ME Master Handoff Prompt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "AxiSight-ME Master Handoff Prompt",
+            "line": 1
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 27,
+        "line_count": 83
+      },
+      "summary": "**AxiSight-ME Master Handoff Prompt**\nPaste the prompt below into Claude Code when you want Claude to take over this project in a structured way.\n(27 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "GEMINI.md",
+      "filename": "GEMINI.md",
+      "category": "overview",
+      "size_bytes": 2420,
+      "title": "Gemini Project Analysis: AxiSight",
+      "structure": {
+        "title": "Gemini Project Analysis: AxiSight",
+        "headers": [
+          {
+            "level": 1,
+            "text": "Gemini Project Analysis: AxiSight",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Project Overview",
+            "line": 3
+          },
+          {
+            "level": 2,
+            "text": "Building and Running",
+            "line": 11
+          },
+          {
+            "level": 3,
+            "text": "AxiSight Android App",
+            "line": 13
+          },
+          {
+            "level": 3,
+            "text": "CNC Alignment Tool (Python)",
+            "line": 41
+          },
+          {
+            "level": 2,
+            "text": "Development Conventions",
+            "line": 63
+          },
+          {
+            "level": 3,
+            "text": "Android",
+            "line": 65
+          },
+          {
+            "level": 3,
+            "text": "USB Camera Support",
+            "line": 73
+          },
+          {
+            "level": 3,
+            "text": "Python",
+            "line": 79
+          }
+        ],
+        "code_blocks": [
+          {
+            "language": "bash",
+            "code": "./gradlew build"
+          },
+          {
+            "language": "bash",
+            "code": "./gradlew assembleDebug"
+          },
+          {
+            "language": "bash",
+            "code": "adb install app/build/outputs/apk/debug/app-debug.apk"
+          },
+          {
+            "language": "bash",
+            "code": "python cnc_alignment_app.py"
+          },
+          {
+            "language": "bash",
+            "code": "python cnc_alignment_app.py --help"
+          }
+        ],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 32,
+        "line_count": 84
+      },
+      "summary": "**Gemini Project Analysis: AxiSight**\nSections: Project Overview, Building and Running, AxiSight Android App, CNC Alignment Tool (Python), Development Conventions\nThis repository contains two main components:\n(32 words, 5 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 5,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 6.0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\AlignmentHistoryStore.md",
+      "filename": "AlignmentHistoryStore.md",
+      "category": "api",
+      "size_bytes": 545,
+      "title": "API Reference: AlignmentHistoryStore.kt",
+      "structure": {
+        "title": "API Reference: AlignmentHistoryStore.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: AlignmentHistoryStore.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "AlignmentHistoryStore",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "append(record: AlignmentRecord)",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "readAll() \u2192 List<AlignmentRecord>",
+            "line": 26
+          },
+          {
+            "level": 5,
+            "text": "exportPath() \u2192 String",
+            "line": 31
+          }
+        ],
+        "code_blocks": [],
+        "tables": 1,
+        "images": 0,
+        "links": 0,
+        "word_count": 15,
+        "line_count": 37
+      },
+      "summary": "**API Reference: AlignmentHistoryStore.kt**\nSections: Classes, AlignmentHistoryStore\n**Language**: Kotlin\n(15 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 1,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\AlignmentHistoryStoreTest.md",
+      "filename": "AlignmentHistoryStoreTest.md",
+      "category": "api",
+      "size_bytes": 328,
+      "title": "API Reference: AlignmentHistoryStoreTest.kt",
+      "structure": {
+        "title": "API Reference: AlignmentHistoryStoreTest.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: AlignmentHistoryStoreTest.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "AlignmentHistoryStoreTest",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "newStore() \u2192 AlignmentHistoryStore",
+            "line": 17
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 10,
+        "line_count": 23
+      },
+      "summary": "**API Reference: AlignmentHistoryStoreTest.kt**\nSections: Classes, AlignmentHistoryStoreTest\n**Language**: Kotlin\n(10 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\AuthManager.md",
+      "filename": "AuthManager.md",
+      "category": "api",
+      "size_bytes": 1199,
+      "title": "API Reference: AuthManager.kt",
+      "structure": {
+        "title": "API Reference: AuthManager.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: AuthManager.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "AuthManager",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "signOut(context: Context)",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "requireAuth(activity: AppCompatActivity)",
+            "line": 26
+          },
+          {
+            "level": 5,
+            "text": "redirectToLogin(activity: AppCompatActivity)",
+            "line": 35
+          },
+          {
+            "level": 5,
+            "text": "addAuthStateListener(listener: FirebaseAuth.AuthStateListener)",
+            "line": 44
+          },
+          {
+            "level": 5,
+            "text": "removeAuthStateListener(listener: FirebaseAuth.AuthStateListener)",
+            "line": 53
+          }
+        ],
+        "code_blocks": [],
+        "tables": 5,
+        "images": 0,
+        "links": 0,
+        "word_count": 23,
+        "line_count": 63
+      },
+      "summary": "**API Reference: AuthManager.kt**\nSections: Classes, AuthManager\n**Language**: Kotlin\n(23 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 5,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\AxisightApp.md",
+      "filename": "AxisightApp.md",
+      "category": "api",
+      "size_bytes": 796,
+      "title": "API Reference: AxisightApp.kt",
+      "structure": {
+        "title": "API Reference: AxisightApp.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: AxisightApp.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "AxisightApp",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "onCreate()",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "installAuthStateListener()",
+            "line": 20
+          },
+          {
+            "level": 5,
+            "text": "installUsbMonitorCrashGuard()",
+            "line": 23
+          },
+          {
+            "level": 5,
+            "text": "isKnownUsbMonitorPermissionRace(thread: Thread, throwable: Throwable) \u2192 Boolean",
+            "line": 26
+          },
+          {
+            "level": 5,
+            "text": "hasUsbMonitorStackFrame(throwable: Throwable) \u2192 Boolean",
+            "line": 38
+          }
+        ],
+        "code_blocks": [],
+        "tables": 2,
+        "images": 0,
+        "links": 0,
+        "word_count": 19,
+        "line_count": 50
+      },
+      "summary": "**API Reference: AxisightApp.kt**\nSections: Classes, AxisightApp\n**Language**: Kotlin\n(19 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 2,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\BlobDetector.md",
+      "filename": "BlobDetector.md",
+      "category": "api",
+      "size_bytes": 3888,
+      "title": "API Reference: BlobDetector.kt",
+      "structure": {
+        "title": "API Reference: BlobDetector.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: BlobDetector.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "DetectionResult",
+            "line": 11
+          },
+          {
+            "level": 3,
+            "text": "FailureReason",
+            "line": 17
+          },
+          {
+            "level": 3,
+            "text": "Scratch",
+            "line": 23
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 27
+          },
+          {
+            "level": 5,
+            "text": "ensure(cells: Int)",
+            "line": 29
+          },
+          {
+            "level": 5,
+            "text": "ensureComponents(count: Int)",
+            "line": 38
+          },
+          {
+            "level": 3,
+            "text": "BlobDetector",
+            "line": 49
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 53
+          },
+          {
+            "level": 5,
+            "text": "ensure(cells: Int)",
+            "line": 55
+          },
+          {
+            "level": 5,
+            "text": "ensureComponents(count: Int)",
+            "line": 64
+          },
+          {
+            "level": 5,
+            "text": "isInsideTarget(i: Int, j: Int, ds: Int, cfg: DetectorConfig) \u2192 Boolean",
+            "line": 73
+          },
+          {
+            "level": 5,
+            "text": "pixelToLuminance(argb: Int) \u2192 Int",
+            "line": 87
+          },
+          {
+            "level": 5,
+            "text": "sampleBilinear(fi: Double, fj: Double, dw: Int, dh: Int, getPixel: (Int, Int)",
+            "line": 98
+          },
+          {
+            "level": 5,
+            "text": "refineBoundary(cxD: Double, cyD: Double, estRadiusD: Double, thr: Int, dw: Int, dh: Int, getPixel: (Int, Int)",
+            "line": 112
+          },
+          {
+            "level": 5,
+            "text": "effectiveMaxArea(cfg: DetectorConfig) \u2192 Int",
+            "line": 128
+          },
+          {
+            "level": 5,
+            "text": "detectCore(dw: Int, dh: Int, ds: Int, cfg: DetectorConfig, getPixel: (i: Int, j: Int)",
+            "line": 139
+          },
+          {
+            "level": 5,
+            "text": "circularityOf(comp: DoubleArray, base: Int) \u2192 Double",
+            "line": 153
+          },
+          {
+            "level": 5,
+            "text": "detectDarkDotCenter(image: ImageProxy, cfg: DetectorConfig) \u2192 DetectionResult",
+            "line": 165
+          },
+          {
+            "level": 5,
+            "text": "detectDarkDotCenter(nv21: ByteArray, width: Int, height: Int, cfg: DetectorConfig) \u2192 DetectionResult",
+            "line": 177
+          },
+          {
+            "level": 5,
+            "text": "detectDarkDotCenter(bitmap: Bitmap, cfg: DetectorConfig) \u2192 DetectionResult",
+            "line": 191
+          }
+        ],
+        "code_blocks": [],
+        "tables": 14,
+        "images": 0,
+        "links": 0,
+        "word_count": 64,
+        "line_count": 204
+      },
+      "summary": "**API Reference: BlobDetector.kt**\nSections: Classes, DetectionResult, FailureReason, Scratch, BlobDetector\n**Language**: Kotlin\n(64 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 14,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\BlobDetectorTest.md",
+      "filename": "BlobDetectorTest.md",
+      "category": "api",
+      "size_bytes": 4623,
+      "title": "API Reference: BlobDetectorTest.kt",
+      "structure": {
+        "title": "API Reference: BlobDetectorTest.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: BlobDetectorTest.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "BlobDetectorTest",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "syntheticBitmap(width: Int = 200, height: Int = 200, cx: Int = 100, cy: Int = 100, radius: Int = 20, dotLuminance: Int = 30, bgLuminance: Int = 200) \u2192 Bitmap",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "syntheticBitmapFractional(width: Int = 200, height: Int = 200, cx: Double, cy: Double, radius: Double = 20.0, dotLuminance: Int = 30, bgLuminance: Int = 200) \u2192 Bitmap",
+            "line": 34
+          },
+          {
+            "level": 5,
+            "text": "syntheticGradientBitmap(width: Int = 200, height: Int = 200, cx: Int = 100, cy: Int = 100, radius: Int = 30, dotLumMin: Int = 10, dotLumMax: Int = 80, bgLuminance: Int = 220) \u2192 Bitmap",
+            "line": 51
+          },
+          {
+            "level": 5,
+            "text": "cfg(minArea: Int = 50, maxArea: Int = 10000, minCirc: Double = 0.5, kStd: Double = 1.0, ds: Int = 2, minContrast: Double = 0.05   // permissive default for legacy tests)",
+            "line": 69
+          },
+          {
+            "level": 5,
+            "text": "filterCfg(consecutiveRequired: Int = 1, maxJump: Float = Float.MAX_VALUE, alpha: Float = 0.5f)",
+            "line": 83
+          },
+          {
+            "level": 5,
+            "text": "syntheticBitmapSoftEdge(width: Int = 200, height: Int = 200, cx: Int = 100, cy: Int = 100, radius: Int = 30, bandPx: Double = 16.0, dotLuminance: Int = 30, bgLuminance: Int = 200) \u2192 Bitmap",
+            "line": 94
+          },
+          {
+            "level": 5,
+            "text": "getBuffer()",
+            "line": 112
+          },
+          {
+            "level": 5,
+            "text": "getRowStride()",
+            "line": 115
+          },
+          {
+            "level": 5,
+            "text": "getPixelStride()",
+            "line": 118
+          },
+          {
+            "level": 5,
+            "text": "getPlanes()",
+            "line": 121
+          },
+          {
+            "level": 5,
+            "text": "getWidth()",
+            "line": 124
+          },
+          {
+            "level": 5,
+            "text": "getHeight()",
+            "line": 127
+          },
+          {
+            "level": 5,
+            "text": "getFormat()",
+            "line": 130
+          },
+          {
+            "level": 5,
+            "text": "getImageInfo()",
+            "line": 133
+          },
+          {
+            "level": 5,
+            "text": "getRotationDegrees()",
+            "line": 136
+          },
+          {
+            "level": 5,
+            "text": "getTimestamp()",
+            "line": 139
+          },
+          {
+            "level": 5,
+            "text": "getTagBundle()",
+            "line": 142
+          },
+          {
+            "level": 5,
+            "text": "populateExifData(b: androidx.camera.core.impl.utils.ExifData.Builder)",
+            "line": 145
+          },
+          {
+            "level": 5,
+            "text": "getCropRect()",
+            "line": 154
+          },
+          {
+            "level": 5,
+            "text": "setCropRect(rect: android.graphics.Rect?)",
+            "line": 157
+          },
+          {
+            "level": 5,
+            "text": "toBitmap() \u2192 Bitmap",
+            "line": 166
+          },
+          {
+            "level": 5,
+            "text": "getImage() \u2192 android.media.Image?",
+            "line": 171
+          },
+          {
+            "level": 5,
+            "text": "close()",
+            "line": 176
+          },
+          {
+            "level": 5,
+            "text": "toNv21(bmp: Bitmap) \u2192 ByteArray",
+            "line": 179
+          },
+          {
+            "level": 5,
+            "text": "drawScratch(bmp: Bitmap, x0: Int, y0: Int, x1: Int, y1: Int, thickness: Int = 3, lum: Int = 40)",
+            "line": 190
+          },
+          {
+            "level": 3,
+            "text": "PlaneImpl",
+            "line": 207
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 211
+          },
+          {
+            "level": 5,
+            "text": "getBuffer()",
+            "line": 213
+          },
+          {
+            "level": 5,
+            "text": "getRowStride()",
+            "line": 216
+          },
+          {
+            "level": 5,
+            "text": "getPixelStride()",
+            "line": 219
+          }
+        ],
+        "code_blocks": [],
+        "tables": 10,
+        "images": 0,
+        "links": 0,
+        "word_count": 66,
+        "line_count": 223
+      },
+      "summary": "**API Reference: BlobDetectorTest.kt**\nSections: Classes, BlobDetectorTest, PlaneImpl\n**Language**: Kotlin\n(66 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 10,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CalibrationData.md",
+      "filename": "CalibrationData.md",
+      "category": "api",
+      "size_bytes": 2315,
+      "title": "API Reference: CalibrationData.kt",
+      "structure": {
+        "title": "API Reference: CalibrationData.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CalibrationData.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CalibrationData",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "toolOffsetInches(toolX: Float, toolY: Float) \u2192 Pair<Double, Double>",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "fromCenterUpAndScale(centerX: Float, centerY: Float, upPointX: Float, upPointY: Float, inchesPerPixel: Double) \u2192 CalibrationData?",
+            "line": 29
+          },
+          {
+            "level": 3,
+            "text": "CalibrationStore",
+            "line": 46
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 50
+          },
+          {
+            "level": 5,
+            "text": "save(data: CalibrationData)",
+            "line": 52
+          },
+          {
+            "level": 5,
+            "text": "saveCenter(x: Float, y: Float)",
+            "line": 61
+          },
+          {
+            "level": 5,
+            "text": "loadCenterOrNull() \u2192 Pair<Float, Float>?",
+            "line": 71
+          },
+          {
+            "level": 5,
+            "text": "load() \u2192 CalibrationData?",
+            "line": 76
+          },
+          {
+            "level": 5,
+            "text": "saveTarget(x: Float, y: Float, radiusPx: Float)",
+            "line": 81
+          },
+          {
+            "level": 5,
+            "text": "loadTargetOrNull() \u2192 Triple<Float, Float, Float>?",
+            "line": 92
+          },
+          {
+            "level": 5,
+            "text": "saveSource(source: String)",
+            "line": 97
+          },
+          {
+            "level": 5,
+            "text": "loadSourceOrNull() \u2192 String?",
+            "line": 106
+          },
+          {
+            "level": 5,
+            "text": "saveLastSource(source: String)",
+            "line": 111
+          },
+          {
+            "level": 5,
+            "text": "loadLastSourceOrNull() \u2192 String?",
+            "line": 120
+          },
+          {
+            "level": 5,
+            "text": "isFinite() \u2192 Boolean",
+            "line": 125
+          }
+        ],
+        "code_blocks": [],
+        "tables": 7,
+        "images": 0,
+        "links": 0,
+        "word_count": 46,
+        "line_count": 131
+      },
+      "summary": "**API Reference: CalibrationData.kt**\nSections: Classes, CalibrationData, CalibrationStore\n**Language**: Kotlin\n(46 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 7,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CalibrationQuality.md",
+      "filename": "CalibrationQuality.md",
+      "category": "api",
+      "size_bytes": 817,
+      "title": "API Reference: CalibrationQuality.kt",
+      "structure": {
+        "title": "API Reference: CalibrationQuality.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CalibrationQuality.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CalibrationQualityEvaluator",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "evaluate(center: Pair<Float, Float>, upPoint: Pair<Float, Float>, scaleP1: Pair<Float, Float>, scaleP2: Pair<Float, Float>, knownInches: Double) \u2192 CalibrationQuality",
+            "line": 17
+          }
+        ],
+        "code_blocks": [],
+        "tables": 1,
+        "images": 0,
+        "links": 0,
+        "word_count": 12,
+        "line_count": 37
+      },
+      "summary": "**API Reference: CalibrationQuality.kt**\nSections: Classes, CalibrationQualityEvaluator\n**Language**: Kotlin\n(12 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 1,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CalibrationQualityEvaluatorTest.md",
+      "filename": "CalibrationQualityEvaluatorTest.md",
+      "category": "api",
+      "size_bytes": 256,
+      "title": "API Reference: CalibrationQualityEvaluatorTest.kt",
+      "structure": {
+        "title": "API Reference: CalibrationQualityEvaluatorTest.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CalibrationQualityEvaluatorTest.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CalibrationQualityEvaluatorTest",
+            "line": 11
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 7,
+        "line_count": 16
+      },
+      "summary": "**API Reference: CalibrationQualityEvaluatorTest.kt**\nSections: Classes, CalibrationQualityEvaluatorTest\n**Language**: Kotlin\n(7 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CalibrationStoreTest.md",
+      "filename": "CalibrationStoreTest.md",
+      "category": "api",
+      "size_bytes": 246,
+      "title": "API Reference: CalibrationStoreTest.kt",
+      "structure": {
+        "title": "API Reference: CalibrationStoreTest.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CalibrationStoreTest.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CalibrationStoreTest",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "setUp()",
+            "line": 17
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 9,
+        "line_count": 21
+      },
+      "summary": "**API Reference: CalibrationStoreTest.kt**\nSections: Classes, CalibrationStoreTest\n**Language**: Kotlin\n(9 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CalibrationViewModel.md",
+      "filename": "CalibrationViewModel.md",
+      "category": "api",
+      "size_bytes": 481,
+      "title": "API Reference: CalibrationViewModel.kt",
+      "structure": {
+        "title": "API Reference: CalibrationViewModel.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CalibrationViewModel.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "Step",
+            "line": 11
+          },
+          {
+            "level": 3,
+            "text": "Factory",
+            "line": 17
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 21
+          },
+          {
+            "level": 5,
+            "text": "create(modelClass: Class<T>) \u2192 T",
+            "line": 23
+          }
+        ],
+        "code_blocks": [],
+        "tables": 1,
+        "images": 0,
+        "links": 0,
+        "word_count": 14,
+        "line_count": 35
+      },
+      "summary": "**API Reference: CalibrationViewModel.kt**\nSections: Classes, Step, Factory\n**Language**: Kotlin\n(14 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 1,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CalibrationViewModelTest.md",
+      "filename": "CalibrationViewModelTest.md",
+      "category": "api",
+      "size_bytes": 340,
+      "title": "API Reference: CalibrationViewModelTest.kt",
+      "structure": {
+        "title": "API Reference: CalibrationViewModelTest.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CalibrationViewModelTest.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CalibrationViewModelTest",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "setUp()",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "drainEffects() \u2192 List<Effect>",
+            "line": 20
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 11,
+        "line_count": 26
+      },
+      "summary": "**API Reference: CalibrationViewModelTest.kt**\nSections: Classes, CalibrationViewModelTest\n**Language**: Kotlin\n(11 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CameraController.md",
+      "filename": "CameraController.md",
+      "category": "api",
+      "size_bytes": 261,
+      "title": "API Reference: CameraController.kt",
+      "structure": {
+        "title": "API Reference: CameraController.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CameraController.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CameraController",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "stopAll()",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "dispose()",
+            "line": 20
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 10,
+        "line_count": 24
+      },
+      "summary": "**API Reference: CameraController.kt**\nSections: Classes, CameraController\n**Language**: Kotlin\n(10 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CameraSourceType.md",
+      "filename": "CameraSourceType.md",
+      "category": "api",
+      "size_bytes": 211,
+      "title": "API Reference: CameraSourceType.kt",
+      "structure": {
+        "title": "API Reference: CameraSourceType.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CameraSourceType.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CameraSourceType",
+            "line": 11
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 7,
+        "line_count": 16
+      },
+      "summary": "**API Reference: CameraSourceType.kt**\nSections: Classes, CameraSourceType\n**Language**: Kotlin\n(7 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CircleFit.md",
+      "filename": "CircleFit.md",
+      "category": "api",
+      "size_bytes": 708,
+      "title": "API Reference: CircleFit.kt",
+      "structure": {
+        "title": "API Reference: CircleFit.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CircleFit.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CircleFit",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "fit(points: List<Pair<Double, Double>>) \u2192 Result?",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "solve3x3(A: Array<DoubleArray>, b: DoubleArray) \u2192 DoubleArray?",
+            "line": 29
+          }
+        ],
+        "code_blocks": [],
+        "tables": 2,
+        "images": 0,
+        "links": 0,
+        "word_count": 16,
+        "line_count": 42
+      },
+      "summary": "**API Reference: CircleFit.kt**\nSections: Classes, CircleFit\n**Language**: Kotlin\n(16 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 2,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CircleFitTest.md",
+      "filename": "CircleFitTest.md",
+      "category": "api",
+      "size_bytes": 566,
+      "title": "API Reference: CircleFitTest.kt",
+      "structure": {
+        "title": "API Reference: CircleFitTest.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CircleFitTest.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CircleFitTest",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "pointsOnCircle(cx: Double, cy: Double, r: Double, angles: List<Double>) \u2192 List<Pair<Double, Double>>",
+            "line": 17
+          }
+        ],
+        "code_blocks": [],
+        "tables": 1,
+        "images": 0,
+        "links": 0,
+        "word_count": 12,
+        "line_count": 32
+      },
+      "summary": "**API Reference: CircleFitTest.kt**\nSections: Classes, CircleFitTest\n**Language**: Kotlin\n(12 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 1,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CoordinateMapper.md",
+      "filename": "CoordinateMapper.md",
+      "category": "api",
+      "size_bytes": 2078,
+      "title": "API Reference: CoordinateMapper.kt",
+      "structure": {
+        "title": "API Reference: CoordinateMapper.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CoordinateMapper.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CoordinateMapper",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "update(imageWidth: Int, imageHeight: Int, rotationDegrees: Int, viewWidth: Int, viewHeight: Int, viewOffsetX: Float = 0f, viewOffsetY: Float = 0f)",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "imageToView(x: Float, y: Float) \u2192 Pair<Float, Float>",
+            "line": 32
+          },
+          {
+            "level": 5,
+            "text": "viewToImage(x: Float, y: Float) \u2192 Pair<Float, Float>",
+            "line": 44
+          },
+          {
+            "level": 5,
+            "text": "imageRadiusToView(radius: Float) \u2192 Float",
+            "line": 56
+          },
+          {
+            "level": 5,
+            "text": "viewRadiusToImage(radius: Float) \u2192 Float",
+            "line": 67
+          },
+          {
+            "level": 5,
+            "text": "invalidate()",
+            "line": 78
+          },
+          {
+            "level": 5,
+            "text": "imageToLogical(xi: Float, yi: Float) \u2192 Pair<Float, Float>",
+            "line": 81
+          },
+          {
+            "level": 5,
+            "text": "logicalToImage(lx: Float, ly: Float) \u2192 Pair<Float, Float>",
+            "line": 93
+          }
+        ],
+        "code_blocks": [],
+        "tables": 7,
+        "images": 0,
+        "links": 0,
+        "word_count": 36,
+        "line_count": 106
+      },
+      "summary": "**API Reference: CoordinateMapper.kt**\nSections: Classes, CoordinateMapper\n**Language**: Kotlin\n(36 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 7,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CoordinateMapperTest.md",
+      "filename": "CoordinateMapperTest.md",
+      "category": "api",
+      "size_bytes": 216,
+      "title": "API Reference: CoordinateMapperTest.kt",
+      "structure": {
+        "title": "API Reference: CoordinateMapperTest.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CoordinateMapperTest.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CoordinateMapperTest",
+            "line": 11
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 7,
+        "line_count": 16
+      },
+      "summary": "**API Reference: CoordinateMapperTest.kt**\nSections: Classes, CoordinateMapperTest\n**Language**: Kotlin\n(7 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\CsvLogger.md",
+      "filename": "CsvLogger.md",
+      "category": "api",
+      "size_bytes": 421,
+      "title": "API Reference: CsvLogger.kt",
+      "structure": {
+        "title": "API Reference: CsvLogger.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: CsvLogger.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "CsvLogger",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "exportOverlay(overlay: OverlayView, mmPerPx: Double?)",
+            "line": 17
+          }
+        ],
+        "code_blocks": [],
+        "tables": 1,
+        "images": 0,
+        "links": 0,
+        "word_count": 11,
+        "line_count": 28
+      },
+      "summary": "**API Reference: CsvLogger.kt**\nSections: Classes, CsvLogger\n**Language**: Kotlin\n(11 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 1,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\DetectionFilter.md",
+      "filename": "DetectionFilter.md",
+      "category": "api",
+      "size_bytes": 492,
+      "title": "API Reference: DetectionFilter.kt",
+      "structure": {
+        "title": "API Reference: DetectionFilter.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: DetectionFilter.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "DetectionFilter",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "filter(result: DetectionResult, cfg: DetectorConfig = DetectorConfig()",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "reset()",
+            "line": 27
+          }
+        ],
+        "code_blocks": [],
+        "tables": 1,
+        "images": 0,
+        "links": 0,
+        "word_count": 12,
+        "line_count": 31
+      },
+      "summary": "**API Reference: DetectionFilter.kt**\nSections: Classes, DetectionFilter\n**Language**: Kotlin\n(12 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 1,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\FrameAnalyzerTest.md",
+      "filename": "FrameAnalyzerTest.md",
+      "category": "api",
+      "size_bytes": 921,
+      "title": "API Reference: FrameAnalyzerTest.kt",
+      "structure": {
+        "title": "API Reference: FrameAnalyzerTest.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: FrameAnalyzerTest.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "FrameAnalyzerTest",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "nv21Frame(width: Int = 640, height: Int = 480, cx: Int = 320, cy: Int = 240, radius: Int = 20, dotLuminance: Int = 30, bgLuminance: Int = 200) \u2192 ByteArray",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "analyzer(mapper: CoordinateMapper = CoordinateMapper()",
+            "line": 34
+          }
+        ],
+        "code_blocks": [],
+        "tables": 2,
+        "images": 0,
+        "links": 0,
+        "word_count": 15,
+        "line_count": 44
+      },
+      "summary": "**API Reference: FrameAnalyzerTest.kt**\nSections: Classes, FrameAnalyzerTest\n**Language**: Kotlin\n(15 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 2,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\InternalCameraSource.md",
+      "filename": "InternalCameraSource.md",
+      "category": "api",
+      "size_bytes": 1383,
+      "title": "API Reference: InternalCameraSource.kt",
+      "structure": {
+        "title": "API Reference: InternalCameraSource.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: InternalCameraSource.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "InternalCameraSource",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "isAnalysisEnabled() \u2192 Boolean",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "onToolPointDetected(point: FrameAnalyzer.ViewPoint)",
+            "line": 28
+          },
+          {
+            "level": 5,
+            "text": "onLockThresholdSampled(threshold: Int)",
+            "line": 37
+          },
+          {
+            "level": 5,
+            "text": "start()",
+            "line": 46
+          },
+          {
+            "level": 5,
+            "text": "stop()",
+            "line": 49
+          },
+          {
+            "level": 5,
+            "text": "requestLock()",
+            "line": 52
+          },
+          {
+            "level": 5,
+            "text": "cancelLockRequest()",
+            "line": 55
+          },
+          {
+            "level": 5,
+            "text": "dispose()",
+            "line": 58
+          },
+          {
+            "level": 5,
+            "text": "bindUseCases()",
+            "line": 61
+          },
+          {
+            "level": 5,
+            "text": "analyzeFrame(image: ImageProxy)",
+            "line": 64
+          },
+          {
+            "level": 5,
+            "text": "sampleLockThreshold(image: ImageProxy)",
+            "line": 73
+          }
+        ],
+        "code_blocks": [
+          {
+            "language": "text",
+            "code": "    /** Gate for delivering successful detections (tracking enabled). Any thread. */\n    fun isTrackingEnabled"
+          },
+          {
+            "language": "text",
+            "code": "    /** Gate for delivering successful detections (tracking enabled). Any thread. */\n    fun isTrackingEnabled`"
+          }
+        ],
+        "tables": 4,
+        "images": 0,
+        "links": 0,
+        "word_count": 30,
+        "line_count": 83
+      },
+      "summary": "**API Reference: InternalCameraSource.kt**\nSections: Classes, InternalCameraSource\n**Language**: Kotlin\n(30 words, 2 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 4,
+        "cross_references": 0,
+        "code_blocks": 2,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 7.5
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\LoginActivity.md",
+      "filename": "LoginActivity.md",
+      "category": "api",
+      "size_bytes": 1522,
+      "title": "API Reference: LoginActivity.kt",
+      "structure": {
+        "title": "API Reference: LoginActivity.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: LoginActivity.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "LoginActivity",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "onCreate(savedInstanceState: Bundle?)",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "handleEmailSignIn()",
+            "line": 26
+          },
+          {
+            "level": 5,
+            "text": "handleGoogleSignIn()",
+            "line": 29
+          },
+          {
+            "level": 5,
+            "text": "handleCreateAccount()",
+            "line": 32
+          },
+          {
+            "level": 5,
+            "text": "handleForgotPassword()",
+            "line": 35
+          },
+          {
+            "level": 5,
+            "text": "onActivityResult(requestCode: Int, resultCode: Int, data: Intent?)",
+            "line": 38
+          },
+          {
+            "level": 5,
+            "text": "validateInputs(email: String, password: String) \u2192 Boolean",
+            "line": 49
+          },
+          {
+            "level": 5,
+            "text": "checkBackoff() \u2192 Boolean",
+            "line": 61
+          },
+          {
+            "level": 5,
+            "text": "recordFailure()",
+            "line": 66
+          },
+          {
+            "level": 5,
+            "text": "resetBackoff()",
+            "line": 69
+          },
+          {
+            "level": 5,
+            "text": "setButtonsEnabled(enabled: Boolean)",
+            "line": 72
+          },
+          {
+            "level": 5,
+            "text": "onDestroy()",
+            "line": 81
+          },
+          {
+            "level": 5,
+            "text": "setLoading(loading: Boolean)",
+            "line": 84
+          },
+          {
+            "level": 5,
+            "text": "navigateToMain()",
+            "line": 93
+          }
+        ],
+        "code_blocks": [],
+        "tables": 5,
+        "images": 0,
+        "links": 0,
+        "word_count": 34,
+        "line_count": 97
+      },
+      "summary": "**API Reference: LoginActivity.kt**\nSections: Classes, LoginActivity\n**Language**: Kotlin\n(34 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 5,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\MainActivity.md",
+      "filename": "MainActivity.md",
+      "category": "api",
+      "size_bytes": 5546,
+      "title": "API Reference: MainActivity.kt",
+      "structure": {
+        "title": "API Reference: MainActivity.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: MainActivity.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "MainActivity",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "updateCfg(block: DetectorConfig.()",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "onCreate(savedInstanceState: Bundle?)",
+            "line": 26
+          },
+          {
+            "level": 5,
+            "text": "calibrationAppliesToActiveSource() \u2192 Boolean",
+            "line": 35
+          },
+          {
+            "level": 5,
+            "text": "onNewIntent(intent: Intent)",
+            "line": 40
+          },
+          {
+            "level": 5,
+            "text": "isUsbAttachIntent(intent: Intent?) \u2192 Boolean",
+            "line": 49
+          },
+          {
+            "level": 5,
+            "text": "buildCameraController() \u2192 CameraController",
+            "line": 60
+          },
+          {
+            "level": 5,
+            "text": "isAnalysisEnabled()",
+            "line": 65
+          },
+          {
+            "level": 5,
+            "text": "isTrackingEnabled()",
+            "line": 68
+          },
+          {
+            "level": 5,
+            "text": "onToolPointDetected(point: FrameAnalyzer.ViewPoint)",
+            "line": 71
+          },
+          {
+            "level": 5,
+            "text": "onLockThresholdSampled(threshold: Int)",
+            "line": 80
+          },
+          {
+            "level": 5,
+            "text": "isAnalysisEnabled()",
+            "line": 89
+          },
+          {
+            "level": 5,
+            "text": "isTrackingEnabled()",
+            "line": 92
+          },
+          {
+            "level": 5,
+            "text": "onToolPointDetected(point: FrameAnalyzer.ViewPoint)",
+            "line": 95
+          },
+          {
+            "level": 5,
+            "text": "onError(message: String)",
+            "line": 104
+          },
+          {
+            "level": 5,
+            "text": "configureFragment(fragment: UvcFragment)",
+            "line": 113
+          },
+          {
+            "level": 5,
+            "text": "isAnalysisEnabled()",
+            "line": 122
+          },
+          {
+            "level": 5,
+            "text": "isTrackingEnabled()",
+            "line": 125
+          },
+          {
+            "level": 5,
+            "text": "onToolPointDetected(point: FrameAnalyzer.ViewPoint)",
+            "line": 128
+          },
+          {
+            "level": 5,
+            "text": "onLockThresholdSampled(threshold: Int)",
+            "line": 137
+          },
+          {
+            "level": 5,
+            "text": "showToast(message: String)",
+            "line": 146
+          },
+          {
+            "level": 5,
+            "text": "showRetriesExhausted(retry: ()",
+            "line": 155
+          },
+          {
+            "level": 5,
+            "text": "onStopped()",
+            "line": 164
+          },
+          {
+            "level": 5,
+            "text": "startInternalCamera()",
+            "line": 167
+          },
+          {
+            "level": 5,
+            "text": "startWifiCamera(url: String)",
+            "line": 170
+          },
+          {
+            "level": 5,
+            "text": "startUsbCamera()",
+            "line": 179
+          },
+          {
+            "level": 5,
+            "text": "showCalibrationHelp()",
+            "line": 182
+          },
+          {
+            "level": 5,
+            "text": "handleCalibrationEffect(effect: CalibrationViewModel.Effect)",
+            "line": 185
+          },
+          {
+            "level": 5,
+            "text": "renderCalibrationPanel(s: CalibrationViewModel.UiState)",
+            "line": 194
+          },
+          {
+            "level": 5,
+            "text": "applyLoadedCalibration()",
+            "line": 203
+          },
+          {
+            "level": 5,
+            "text": "restoreLoadedCalibrationIfPending()",
+            "line": 206
+          },
+          {
+            "level": 5,
+            "text": "onToolPointDetected(x: Float, y: Float, quality: DetectionQuality? = null)",
+            "line": 209
+          },
+          {
+            "level": 5,
+            "text": "applyZoom(factor: Float)",
+            "line": 220
+          },
+          {
+            "level": 5,
+            "text": "applyLockThreshold(threshold: Int, sourceTag: String)",
+            "line": 229
+          },
+          {
+            "level": 5,
+            "text": "applyEdgeToEdgeInsets()",
+            "line": 239
+          },
+          {
+            "level": 5,
+            "text": "updateParamsSummary()",
+            "line": 242
+          },
+          {
+            "level": 5,
+            "text": "updateDeltaReadout()",
+            "line": 245
+          },
+          {
+            "level": 5,
+            "text": "signalConfidencePercent(quality: DetectionQuality, cfg: DetectorConfig) \u2192 Double",
+            "line": 248
+          },
+          {
+            "level": 5,
+            "text": "noDetectionHint() \u2192 String",
+            "line": 260
+          },
+          {
+            "level": 5,
+            "text": "run()",
+            "line": 265
+          },
+          {
+            "level": 5,
+            "text": "updateQualityReadout()",
+            "line": 268
+          },
+          {
+            "level": 5,
+            "text": "appendSegment(text: String, colorRes: Int)",
+            "line": 271
+          },
+          {
+            "level": 5,
+            "text": "logCurrentAlignment()",
+            "line": 281
+          },
+          {
+            "level": 5,
+            "text": "exportAlignmentHistory()",
+            "line": 284
+          },
+          {
+            "level": 5,
+            "text": "onResume()",
+            "line": 287
+          },
+          {
+            "level": 5,
+            "text": "onPause()",
+            "line": 290
+          },
+          {
+            "level": 5,
+            "text": "onDestroy()",
+            "line": 293
+          },
+          {
+            "level": 5,
+            "text": "ensureCameraPermission(onGranted: ()",
+            "line": 296
+          },
+          {
+            "level": 5,
+            "text": "run()",
+            "line": 305
+          },
+          {
+            "level": 5,
+            "text": "updateTrackingButtons()",
+            "line": 308
+          },
+          {
+            "level": 5,
+            "text": "isNearTargetEdge(x: Float, y: Float) \u2192 Boolean",
+            "line": 311
+          }
+        ],
+        "code_blocks": [],
+        "tables": 23,
+        "images": 0,
+        "links": 0,
+        "word_count": 110,
+        "line_count": 324
+      },
+      "summary": "**API Reference: MainActivity.kt**\nSections: Classes, MainActivity\n**Language**: Kotlin\n(110 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 23,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\RotationFit.md",
+      "filename": "RotationFit.md",
+      "category": "api",
+      "size_bytes": 1103,
+      "title": "API Reference: RotationFit.kt",
+      "structure": {
+        "title": "API Reference: RotationFit.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: RotationFit.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "RotationFitEvaluator",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "evaluate(samples: List<Pair<Float, Float>>) \u2192 RotationFitQuality",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "coverageFraction(samples: List<Pair<Float, Float>>, cx: Double, cy: Double) \u2192 Double",
+            "line": 29
+          },
+          {
+            "level": 5,
+            "text": "bucketIndex(x: Float, y: Float, cx: Double, cy: Double) \u2192 Int",
+            "line": 43
+          }
+        ],
+        "code_blocks": [],
+        "tables": 3,
+        "images": 0,
+        "links": 0,
+        "word_count": 20,
+        "line_count": 58
+      },
+      "summary": "**API Reference: RotationFit.kt**\nSections: Classes, RotationFitEvaluator\n**Language**: Kotlin\n(20 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 3,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\RotationFitEvaluatorTest.md",
+      "filename": "RotationFitEvaluatorTest.md",
+      "category": "api",
+      "size_bytes": 652,
+      "title": "API Reference: RotationFitEvaluatorTest.kt",
+      "structure": {
+        "title": "API Reference: RotationFitEvaluatorTest.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: RotationFitEvaluatorTest.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "RotationFitEvaluatorTest",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "circlePoints(cx: Float, cy: Float, radius: Float, count: Int, sweepDegrees: Double = 360.0) \u2192 List<Pair<Float, Float>>",
+            "line": 17
+          }
+        ],
+        "code_blocks": [],
+        "tables": 1,
+        "images": 0,
+        "links": 0,
+        "word_count": 12,
+        "line_count": 33
+      },
+      "summary": "**API Reference: RotationFitEvaluatorTest.kt**\nSections: Classes, RotationFitEvaluatorTest\n**Language**: Kotlin\n(12 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 1,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\UsbCameraController.md",
+      "filename": "UsbCameraController.md",
+      "category": "api",
+      "size_bytes": 3028,
+      "title": "API Reference: UsbCameraController.kt",
+      "structure": {
+        "title": "API Reference: UsbCameraController.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: UsbCameraController.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "UsbCameraController",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "configureFragment(fragment: UvcFragment)",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "showToast(message: String)",
+            "line": 26
+          },
+          {
+            "level": 5,
+            "text": "showRetriesExhausted(retry: ()",
+            "line": 35
+          },
+          {
+            "level": 5,
+            "text": "onStopped()",
+            "line": 44
+          },
+          {
+            "level": 5,
+            "text": "onReceive(context: Context?, intent: Intent?)",
+            "line": 47
+          },
+          {
+            "level": 5,
+            "text": "onReceive(context: Context?, intent: Intent?)",
+            "line": 57
+          },
+          {
+            "level": 5,
+            "text": "onReceive(context: Context?, intent: Intent?)",
+            "line": 67
+          },
+          {
+            "level": 5,
+            "text": "start()",
+            "line": 77
+          },
+          {
+            "level": 5,
+            "text": "stop()",
+            "line": 80
+          },
+          {
+            "level": 5,
+            "text": "dispose()",
+            "line": 83
+          },
+          {
+            "level": 5,
+            "text": "currentFragment() \u2192 UvcFragment?",
+            "line": 86
+          },
+          {
+            "level": 5,
+            "text": "requestLock()",
+            "line": 91
+          },
+          {
+            "level": 5,
+            "text": "cancelLockRequest()",
+            "line": 94
+          },
+          {
+            "level": 5,
+            "text": "restartAfterDelay(delayMs: Long)",
+            "line": 97
+          },
+          {
+            "level": 5,
+            "text": "openPermittedCamera(preferredDevice: UsbDevice?) \u2192 Boolean",
+            "line": 106
+          },
+          {
+            "level": 5,
+            "text": "showFragment(device: UsbDevice)",
+            "line": 117
+          },
+          {
+            "level": 5,
+            "text": "onUsbCameraOpened()",
+            "line": 126
+          },
+          {
+            "level": 5,
+            "text": "onUsbCameraClosed()",
+            "line": 129
+          },
+          {
+            "level": 5,
+            "text": "onUsbCameraError(message: String?)",
+            "line": 132
+          },
+          {
+            "level": 5,
+            "text": "requestPermission(usbManager: UsbManager, device: UsbDevice)",
+            "line": 141
+          },
+          {
+            "level": 5,
+            "text": "scheduleFragmentRetry(reason: String)",
+            "line": 151
+          },
+          {
+            "level": 5,
+            "text": "registerPermissionReceiverIfNeeded()",
+            "line": 160
+          },
+          {
+            "level": 5,
+            "text": "registerRecoveryReceiverIfNeeded()",
+            "line": 163
+          },
+          {
+            "level": 5,
+            "text": "registerAttachReceiverIfNeeded()",
+            "line": 166
+          },
+          {
+            "level": 5,
+            "text": "unregisterPermissionReceiverIfNeeded()",
+            "line": 169
+          },
+          {
+            "level": 5,
+            "text": "unregisterRecoveryReceiverIfNeeded()",
+            "line": 172
+          },
+          {
+            "level": 5,
+            "text": "unregisterAttachReceiverIfNeeded()",
+            "line": 175
+          }
+        ],
+        "code_blocks": [],
+        "tables": 12,
+        "images": 0,
+        "links": 0,
+        "word_count": 61,
+        "line_count": 179
+      },
+      "summary": "**API Reference: UsbCameraController.kt**\nSections: Classes, UsbCameraController\n**Language**: Kotlin\n(61 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 12,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\UsbDeviceUtils.md",
+      "filename": "UsbDeviceUtils.md",
+      "category": "api",
+      "size_bytes": 857,
+      "title": "API Reference: UsbDeviceUtils.kt",
+      "structure": {
+        "title": "API Reference: UsbDeviceUtils.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: UsbDeviceUtils.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "UsbDeviceUtils",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "isUvcDevice(device: UsbDevice) \u2192 Boolean",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "findFirstUvcDevice(usbManager: UsbManager) \u2192 UsbDevice?",
+            "line": 28
+          },
+          {
+            "level": 5,
+            "text": "getUsbDeviceExtra(intent: Intent) \u2192 UsbDevice?",
+            "line": 39
+          }
+        ],
+        "code_blocks": [],
+        "tables": 3,
+        "images": 0,
+        "links": 0,
+        "word_count": 20,
+        "line_count": 51
+      },
+      "summary": "**API Reference: UsbDeviceUtils.kt**\nSections: Classes, UsbDeviceUtils\n**Language**: Kotlin\n(20 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 3,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\UvcFragment.md",
+      "filename": "UvcFragment.md",
+      "category": "api",
+      "size_bytes": 4512,
+      "title": "API Reference: UvcFragment.kt",
+      "structure": {
+        "title": "API Reference: UvcFragment.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: UvcFragment.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "UvcFragment",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "isAnalysisEnabled() \u2192 Boolean",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "onToolPointDetected(point: FrameAnalyzer.ViewPoint)",
+            "line": 28
+          },
+          {
+            "level": 5,
+            "text": "onLockThresholdSampled(threshold: Int)",
+            "line": 37
+          },
+          {
+            "level": 5,
+            "text": "onUsbCameraOpened()",
+            "line": 46
+          },
+          {
+            "level": 5,
+            "text": "onUsbCameraClosed()",
+            "line": 49
+          },
+          {
+            "level": 5,
+            "text": "onUsbCameraError(message: String?)",
+            "line": 52
+          },
+          {
+            "level": 5,
+            "text": "onPreviewData(data: ByteArray?, width: Int, height: Int, format: IPreviewDataCallBack.DataFormat)",
+            "line": 61
+          },
+          {
+            "level": 5,
+            "text": "attachAnalyzer(analyzer: FrameAnalyzer, listener: FrameListener)",
+            "line": 73
+          },
+          {
+            "level": 5,
+            "text": "setCameraStateListener(listener: CameraStateListener?)",
+            "line": 83
+          },
+          {
+            "level": 5,
+            "text": "requestLock()",
+            "line": 92
+          },
+          {
+            "level": 5,
+            "text": "cancelLockRequest()",
+            "line": 95
+          },
+          {
+            "level": 5,
+            "text": "onCreate(savedInstanceState: Bundle?)",
+            "line": 98
+          },
+          {
+            "level": 5,
+            "text": "getRootView(inflater: LayoutInflater, container: ViewGroup?) \u2192 View",
+            "line": 107
+          },
+          {
+            "level": 5,
+            "text": "getCameraView() \u2192 IAspectRatio?",
+            "line": 119
+          },
+          {
+            "level": 5,
+            "text": "getCameraViewContainer() \u2192 ViewGroup",
+            "line": 124
+          },
+          {
+            "level": 5,
+            "text": "getDefaultCamera() \u2192 UsbDevice?",
+            "line": 129
+          },
+          {
+            "level": 5,
+            "text": "getCameraRequest() \u2192 CameraRequest",
+            "line": 134
+          },
+          {
+            "level": 5,
+            "text": "onCameraState(self: MultiCameraClient.ICamera, code: ICameraStateCallBack.State, msg: String?)",
+            "line": 139
+          },
+          {
+            "level": 5,
+            "text": "onResume()",
+            "line": 150
+          },
+          {
+            "level": 5,
+            "text": "onPause()",
+            "line": 153
+          },
+          {
+            "level": 5,
+            "text": "onDestroyView()",
+            "line": 156
+          },
+          {
+            "level": 5,
+            "text": "registerPreviewCallback()",
+            "line": 159
+          },
+          {
+            "level": 5,
+            "text": "unregisterPreviewCallback()",
+            "line": 162
+          },
+          {
+            "level": 5,
+            "text": "onPreviewFrame(data: ByteArray?, width: Int, height: Int, format: IPreviewDataCallBack.DataFormat)",
+            "line": 165
+          },
+          {
+            "level": 5,
+            "text": "processNv21(data: ByteArray, width: Int, height: Int)",
+            "line": 177
+          },
+          {
+            "level": 5,
+            "text": "snapshotViewGeometry(v: View)",
+            "line": 188
+          },
+          {
+            "level": 5,
+            "text": "dispatchOnMain(block: ()",
+            "line": 197
+          },
+          {
+            "level": 5,
+            "text": "startProcessingThread()",
+            "line": 206
+          },
+          {
+            "level": 5,
+            "text": "stopProcessingThread()",
+            "line": 209
+          },
+          {
+            "level": 5,
+            "text": "startProcessing()",
+            "line": 212
+          },
+          {
+            "level": 5,
+            "text": "stopProcessing()",
+            "line": 215
+          },
+          {
+            "level": 5,
+            "text": "scheduleStallWatchdog()",
+            "line": 218
+          },
+          {
+            "level": 5,
+            "text": "cancelStallWatchdog()",
+            "line": 221
+          },
+          {
+            "level": 5,
+            "text": "newInstance(vendorId: Int, productId: Int, deviceName: String?) \u2192 UvcFragment",
+            "line": 224
+          }
+        ],
+        "code_blocks": [
+          {
+            "language": "text",
+            "code": "    /** Gate for delivering successful detections (tracking enabled). Any thread. */\n    fun isTrackingEnabled"
+          },
+          {
+            "language": "text",
+            "code": "    /** Gate for delivering successful detections (tracking enabled). Any thread. */\n    fun isTrackingEnabled`"
+          }
+        ],
+        "tables": 14,
+        "images": 0,
+        "links": 0,
+        "word_count": 79,
+        "line_count": 238
+      },
+      "summary": "**API Reference: UvcFragment.kt**\nSections: Classes, UvcFragment\n**Language**: Kotlin\n(79 words, 2 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 14,
+        "cross_references": 0,
+        "code_blocks": 2,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 7.5
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\api_reference\\WifiCameraSource.md",
+      "filename": "WifiCameraSource.md",
+      "category": "api",
+      "size_bytes": 2277,
+      "title": "API Reference: WifiCameraSource.kt",
+      "structure": {
+        "title": "API Reference: WifiCameraSource.kt",
+        "headers": [
+          {
+            "level": 1,
+            "text": "API Reference: WifiCameraSource.kt",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Classes",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": "WifiCameraSource",
+            "line": 11
+          },
+          {
+            "level": 4,
+            "text": "Methods",
+            "line": 15
+          },
+          {
+            "level": 5,
+            "text": "isAnalysisEnabled() \u2192 Boolean",
+            "line": 17
+          },
+          {
+            "level": 5,
+            "text": "onToolPointDetected(point: FrameAnalyzer.ViewPoint)",
+            "line": 28
+          },
+          {
+            "level": 5,
+            "text": "onError(message: String)",
+            "line": 37
+          },
+          {
+            "level": 5,
+            "text": "start(url: String) \u2192 Boolean",
+            "line": 46
+          },
+          {
+            "level": 5,
+            "text": "stop()",
+            "line": 57
+          },
+          {
+            "level": 5,
+            "text": "isValidRtspUrl(url: String) \u2192 Boolean",
+            "line": 60
+          },
+          {
+            "level": 5,
+            "text": "onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int)",
+            "line": 71
+          },
+          {
+            "level": 5,
+            "text": "onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int)",
+            "line": 82
+          },
+          {
+            "level": 5,
+            "text": "onSurfaceTextureDestroyed(surface: SurfaceTexture) \u2192 Boolean",
+            "line": 93
+          },
+          {
+            "level": 5,
+            "text": "onSurfaceTextureUpdated(surface: SurfaceTexture)",
+            "line": 104
+          }
+        ],
+        "code_blocks": [
+          {
+            "language": "text",
+            "code": "    /** Gate for delivering successful detections (tracking enabled). Main thread. */\n    fun isTrackingEnabled"
+          },
+          {
+            "language": "text",
+            "code": "    /** Gate for delivering successful detections (tracking enabled). Main thread. */\n    fun isTrackingEnabled`"
+          }
+        ],
+        "tables": 8,
+        "images": 0,
+        "links": 0,
+        "word_count": 40,
+        "line_count": 114
+      },
+      "summary": "**API Reference: WifiCameraSource.kt**\nSections: Classes, WifiCameraSource\n**Language**: Kotlin\n(40 words, 2 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 8,
+        "cross_references": 0,
+        "code_blocks": 2,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 7.5
+        }
+      }
+    },
+    {
+      "path": "output\\AxiSight-ME-main\\config_patterns\\config_patterns.md",
+      "filename": "config_patterns.md",
+      "category": "other",
+      "size_bytes": 1577,
+      "title": "Configuration Extraction Report",
+      "structure": {
+        "title": "Configuration Extraction Report",
+        "headers": [
+          {
+            "level": 1,
+            "text": "Configuration Extraction Report",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Configuration Files",
+            "line": 7
+          },
+          {
+            "level": 3,
+            "text": "gradle.properties",
+            "line": 9
+          },
+          {
+            "level": 3,
+            "text": ".claude\\settings.local.json",
+            "line": 15
+          },
+          {
+            "level": 3,
+            "text": ".vscode\\settings.json",
+            "line": 21
+          },
+          {
+            "level": 3,
+            "text": "app\\google-services.json",
+            "line": 28
+          },
+          {
+            "level": 3,
+            "text": "app\\jitpack.yml",
+            "line": 34
+          },
+          {
+            "level": 3,
+            "text": "output\\AxiSight-ME-main\\code_analysis.json",
+            "line": 40
+          },
+          {
+            "level": 3,
+            "text": "output\\AxiSight-ME-main\\dependencies\\dependency_graph.json",
+            "line": 46
+          },
+          {
+            "level": 3,
+            "text": "output\\AxiSight-ME-main\\dependencies\\statistics.json",
+            "line": 52
+          },
+          {
+            "level": 3,
+            "text": "output\\AxiSight-ME-main\\patterns\\all_patterns.json",
+            "line": 58
+          },
+          {
+            "level": 3,
+            "text": "output\\AxiSight-ME-main\\patterns\\critical_patterns.json",
+            "line": 64
+          },
+          {
+            "level": 3,
+            "text": "output\\AxiSight-ME-main\\patterns\\high_confidence_patterns.json",
+            "line": 70
+          },
+          {
+            "level": 3,
+            "text": "output\\AxiSight-ME-main\\patterns\\summary.json",
+            "line": 76
+          }
+        ],
+        "code_blocks": [],
+        "tables": 0,
+        "images": 0,
+        "links": 0,
+        "word_count": 27,
+        "line_count": 82
+      },
+      "summary": "**Configuration Extraction Report**\nSections: Configuration Files, gradle.properties, .claude\\settings.local.json, .vscode\\settings.json, app\\google-services.json\n**Total Files:** 12 **Total Settings:** 200 **Detected Patterns:** None\n(27 words, 0 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 0,
+        "cross_references": 0,
+        "code_blocks": 0,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 0
+        }
+      }
+    },
+    {
+      "path": "README.md",
+      "filename": "README.md",
+      "category": "overview",
+      "size_bytes": 11391,
+      "title": "AxiSight",
+      "structure": {
+        "title": "AxiSight",
+        "headers": [
+          {
+            "level": 1,
+            "text": "AxiSight",
+            "line": 1
+          },
+          {
+            "level": 2,
+            "text": "Requirements",
+            "line": 7
+          },
+          {
+            "level": 2,
+            "text": "Build",
+            "line": 18
+          },
+          {
+            "level": 2,
+            "text": "Firebase Setup",
+            "line": 36
+          },
+          {
+            "level": 2,
+            "text": "Camera Sources",
+            "line": 49
+          },
+          {
+            "level": 3,
+            "text": "16 KB page-size compliance",
+            "line": 59
+          },
+          {
+            "level": 2,
+            "text": "Detection Pipeline",
+            "line": 65
+          },
+          {
+            "level": 3,
+            "text": "Key tuning parameters (Detection Settings panel, \u2699 button)",
+            "line": 93
+          },
+          {
+            "level": 2,
+            "text": "Overlay & Calibration",
+            "line": 107
+          },
+          {
+            "level": 2,
+            "text": "Digital Zoom",
+            "line": 121
+          },
+          {
+            "level": 2,
+            "text": "USB (UVC) Reliability",
+            "line": 127
+          },
+          {
+            "level": 2,
+            "text": "Alignment History",
+            "line": 136
+          },
+          {
+            "level": 2,
+            "text": "Authentication",
+            "line": 145
+          },
+          {
+            "level": 2,
+            "text": "Key Source Files",
+            "line": 153
+          },
+          {
+            "level": 2,
+            "text": "Tests",
+            "line": 178
+          },
+          {
+            "level": 2,
+            "text": "Known Limitations",
+            "line": 196
+          }
+        ],
+        "code_blocks": [
+          {
+            "language": "bash",
+            "code": "# Set JDK 17+ (gradle.properties points at Android Studio's bundled JDK by default)\nexport JAVA_HOME=\"/path/to/jdk-17\"\n\n# Debug APK\n./gradlew assembleDebug\n\n# Unit tests (Robolectric, no device needed)\n./gradlew testDebugUnitTest\n\n# Lint\n./gradlew lintDebug"
+          },
+          {
+            "language": "xml",
+            "code": "   <string name=\"default_web_client_id\">YOUR_WEB_CLIENT_ID_HERE</string>"
+          },
+          {
+            "language": "text",
+            "code": "Camera frame (ImageProxy / Bitmap / NV21 byte[])\n        \u2502\n        \u25bc\n  FrameAnalyzer\n  \u00b7 CoordinateMapper.update(image size, rotation, preview-view size + offset)\n  \u00b7 operator's view-space target circle \u2192 image space (per frame, per source)\n        \u2502\n        \u25bc\n  BlobDetector.detectDarkDotCenter()\n  \u00b7 Pass 1: luminance histogram \u2192 threshold = mean \u2212 kStd \u00d7 \u03c3, + sharpness (Laplacian variance)\n  \u00b7 Pass 2: weighted centroid of pixels below threshold + area gate + contrast-ratio check\n  \u00b7 Pass 3: 2nd-moment circularity check\n  \u00b7 Pass 4: boundary refinement \u2014 radial edge-crossing points \u2192 CircleFit \u2192 sub-pixel center\n        \u2502\n        \u25bc\n  DetectionFilter  (jump gate, confirmation streak, adaptive EMA + dead-band)\n        \u2502\n        \u25bc\n  CoordinateMapper.imageToView()\n  \u00b7 Accounts for FIT_CENTER letterboxing, sensor rotation, and the USB preview's on-screen offset\n        \u2502\n        \u25bc\n  OverlayView.addPoint()  \u2192  CircleFit  \u2192  runout readout + quality readout (Fit/Sharp/Signal)"
+          },
+          {
+            "language": "text",
+            "code": "app/src/test/java/com/etrsystems/axisight/\n\u251c\u2500\u2500 BlobDetectorTest.kt              \u2014 detection accuracy, gating, target mask, NV21 overload, DetectionFilter\n\u251c\u2500\u2500 CircleFitTest.kt\n\u251c\u2500\u2500 CoordinateMapperTest.kt          \u2014 round trips, rotation, letterbox, preview-view offset\n\u251c\u2500\u2500 AlignmentHistoryStoreTest.kt\n\u251c\u2500\u2500 camera/FrameAnalyzerTest.kt      \u2014 NV21 path: image\u2192view mapping, target conversion, tracking gate\n\u251c\u2500\u2500 domain/CalibrationQualityEvaluatorTest.kt\n\u251c\u2500\u2500 domain/RotationFitEvaluatorTest.kt\n\u2514\u2500\u2500 presentation/CalibrationViewModelTest.kt"
+          }
+        ],
+        "tables": 4,
+        "images": 0,
+        "links": 0,
+        "word_count": 54,
+        "line_count": 201
+      },
+      "summary": "**AxiSight**\nSections: Requirements, Build, Firebase Setup, Camera Sources, 16 KB page-size compliance\nCNC spindle-alignment app for Android. Mount a camera in the spindle, rotate 360\u00b0, and the app calculates the true centerline and overlays a digital reference so tools can be aligned faster and more a...\n(54 words, 4 code blocks)",
+      "content": null,
+      "_enhanced": true,
+      "parsed_data": {
+        "tables": 4,
+        "cross_references": 1,
+        "code_blocks": 4,
+        "images": 0,
+        "quality_scores": {
+          "avg_code_quality": 8.5
+        }
+      }
+    }
+  ]
+}

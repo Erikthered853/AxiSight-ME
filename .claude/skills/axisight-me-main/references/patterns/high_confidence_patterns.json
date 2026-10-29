@@ -1,0 +1,88 @@
+[
+  {
+    "pattern_type": "Observer",
+    "category": "Behavioral",
+    "confidence": 0.95,
+    "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\camera\\UsbCameraController.kt",
+    "class_name": "UsbCameraController",
+    "method_name": null,
+    "line_number": 32,
+    "evidence": [
+      "Attach method: registerPermissionReceiverIfNeeded",
+      "Attach method: registerRecoveryReceiverIfNeeded",
+      "Attach method: registerAttachReceiverIfNeeded",
+      "Attach method: unregisterPermissionReceiverIfNeeded",
+      "Detach method: unregisterPermissionReceiverIfNeeded",
+      "Attach method: unregisterRecoveryReceiverIfNeeded",
+      "Detach method: unregisterRecoveryReceiverIfNeeded",
+      "Attach method: unregisterAttachReceiverIfNeeded",
+      "Detach method: unregisterAttachReceiverIfNeeded"
+    ],
+    "related_classes": [],
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\camera\\UsbCameraController.kt"
+  },
+  {
+    "pattern_type": "Observer",
+    "category": "Behavioral",
+    "confidence": 0.95,
+    "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt",
+    "class_name": "MainActivity",
+    "method_name": null,
+    "line_number": 40,
+    "evidence": [
+      "Notify method: updateCfg",
+      "Attach method: isUsbAttachIntent",
+      "Notify method: updateParamsSummary",
+      "Notify method: updateDeltaReadout",
+      "Notify method: updateQualityReadout",
+      "Notify method: updateTrackingButtons"
+    ],
+    "related_classes": [],
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt"
+  },
+  {
+    "pattern_type": "Observer",
+    "category": "Behavioral",
+    "confidence": 0.95,
+    "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\ui\\UvcFragment.kt",
+    "class_name": "UvcFragment",
+    "method_name": null,
+    "line_number": 41,
+    "evidence": [
+      "Attach method: attachAnalyzer",
+      "Attach method: registerPreviewCallback",
+      "Attach method: unregisterPreviewCallback",
+      "Detach method: unregisterPreviewCallback"
+    ],
+    "related_classes": [],
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\ui\\UvcFragment.kt"
+  },
+  {
+    "pattern_type": "Builder",
+    "category": "Creational",
+    "confidence": 0.7000000000000001,
+    "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt",
+    "class_name": "MainActivity",
+    "method_name": null,
+    "line_number": 40,
+    "evidence": [
+      "Has terminal build/create method"
+    ],
+    "related_classes": [],
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt"
+  },
+  {
+    "pattern_type": "Factory",
+    "category": "Creational",
+    "confidence": 0.7,
+    "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\presentation\\CalibrationViewModel.kt",
+    "class_name": "Factory",
+    "method_name": null,
+    "line_number": 397,
+    "evidence": [
+      "Class name contains \"Factory\""
+    ],
+    "related_classes": [],
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\presentation\\CalibrationViewModel.kt"
+  }
+]
