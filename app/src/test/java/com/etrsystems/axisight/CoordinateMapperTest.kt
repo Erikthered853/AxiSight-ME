@@ -93,4 +93,38 @@ class CoordinateMapperTest {
         mapper.update(imageWidth = 0, imageHeight = 480, rotationDegrees = 0, viewWidth = 1280, viewHeight = 960)
         assertFalse(mapper.isValid)
     }
+
+    @Test
+    fun `view offset shifts the mapping without changing scale`() {
+        val mapper = CoordinateMapper()
+        // 640x480 image rendered in a 1280x960 sub-view located at (0, 200) inside the overlay.
+        mapper.update(
+            imageWidth = 640, imageHeight = 480, rotationDegrees = 0,
+            viewWidth = 1280, viewHeight = 960,
+            viewOffsetX = 0f, viewOffsetY = 200f
+        )
+        assertEquals(2f, mapper.imageToViewScale, 1e-4f)
+
+        val (vx, vy) = mapper.imageToView(0f, 0f)
+        assertEquals(0f, vx, 1e-3f)
+        assertEquals(200f, vy, 1e-3f)
+
+        val (ix, iy) = mapper.viewToImage(640f, 680f)
+        assertEquals(320f, ix, 1e-3f)
+        assertEquals(240f, iy, 1e-3f)
+    }
+
+    @Test
+    fun `view offset combines with letterbox offset`() {
+        val mapper = CoordinateMapper()
+        // 4:3 image pillarboxed inside a square 1000x1000 sub-view that starts at x=50.
+        mapper.update(
+            imageWidth = 640, imageHeight = 480, rotationDegrees = 0,
+            viewWidth = 1000, viewHeight = 1000,
+            viewOffsetX = 50f, viewOffsetY = 0f
+        )
+        val (vx, vy) = mapper.imageToView(320f, 240f)
+        assertEquals(550f, vx, 1f) // 50 + 500 (sub-view center)
+        assertEquals(500f, vy, 1f)
+    }
 }

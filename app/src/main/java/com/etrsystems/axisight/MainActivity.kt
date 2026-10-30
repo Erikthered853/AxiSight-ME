@@ -1,108 +1,85 @@
 package com.etrsystems.axisight
 
 import android.Manifest
-import android.app.PendingIntent
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.graphics.SurfaceTexture
-import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
-import com.etrsystems.axisight.usb.UsbDeviceUtils
-import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
-import android.util.Log
 import android.view.MotionEvent
-import android.view.Surface
-import android.view.TextureView
 import android.view.View
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.*
-import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.etrsystems.axisight.databinding.ActivityMainBinding
-import androidx.media3.common.MediaItem
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.rtsp.RtspMediaSource
+import com.etrsystems.axisight.camera.CameraController
+import com.etrsystems.axisight.camera.CameraSourceType
+import com.etrsystems.axisight.camera.FrameAnalyzer
+import com.etrsystems.axisight.camera.InternalCameraSource
+import com.etrsystems.axisight.camera.UsbCameraController
+import com.etrsystems.axisight.camera.WifiCameraSource
+import com.etrsystems.axisight.databinding.ActivityMainBinding
+import com.etrsystems.axisight.domain.CalibrationQualityEvaluator
+import com.etrsystems.axisight.presentation.CalibrationViewModel
+import com.etrsystems.axisight.ui.UvcFragment
+import kotlinx.coroutines.launch
 import java.util.Locale
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.*
 
 @UnstableApi
-class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMainBinding
-    private var cameraProvider: ProcessCameraProvider? = null
-    private var imageAnalyzer: ImageAnalysis? = null
-    private var exoPlayer: ExoPlayer? = null
-    private var usbPermissionReceiverRegistered = false
-    private var usbRecoveryReceiverRegistered = false
-    private var usbAttachReceiverRegistered = false
-    private var pendingUsbDeviceName: String? = null
-    private var usbPermissionRequestInFlight = false
-    private var lastUsbPermissionRequestMs = 0L
-    private val usbPermissionAction by lazy { "${BuildConfig.APPLICATION_ID}.USB_PERMISSION" }
-    // Limits automatic reconnect attempts in MainActivity USB mode to prevent infinite loops.
-    private var usbFragmentRetryCount = 0
+    private lateinit var camera: CameraController
 
-    private enum class CameraSource { INTERNAL, WIFI, USB }
-    private var cameraSource = CameraSource.INTERNAL
+    private val calibrationViewModel: CalibrationViewModel by viewModels {
+        CalibrationViewModel.Factory(CalibrationStore(applicationContext)) {
+            if (::camera.isInitialized) camera.activeType.name else null
+        }
+    }
 
     private var simulate = false
     private var autoDetect = true
     private var inPerPx: Double? = null
-    private var knownInches: Double = DEFAULT_KNOWN_INCHES
 
     private val cfgRef = AtomicReference(DetectorConfig())
     private val cfg get() = cfgRef.get()
     private fun updateCfg(block: DetectorConfig.() -> DetectorConfig) { cfgRef.set(cfgRef.get().block()) }
 
-    private data class DetectionQuality(
-        val circularity: Double,
-        val contrastRatio: Double,
-        val sharpness: Double
-    )
     private var latestDetectionQuality: DetectionQuality? = null
-    private val coordinateMapper = CoordinateMapper()
+    private var latestDetectionAtMs = 0L
+    // The mapper lives in the ViewModel so wizard state and coordinate mapping
+    // survive configuration changes together; camera frames refresh it anyway.
+    private val coordinateMapper get() = calibrationViewModel.coordinateMapper
     private val detectionFilter = DetectionFilter()
+    // Operator's target circle, kept in view space; FrameAnalyzer converts it to image
+    // space per frame through the live mapper (correct for whichever source is running).
+    private val targetViewRef = AtomicReference<FrameAnalyzer.ViewTarget?>(null)
+    private val frameAnalyzer by lazy {
+        FrameAnalyzer(coordinateMapper, detectionFilter, { cfg }, { targetViewRef.get() })
+    }
 
-    private enum class CalibrationStep { NONE, CENTER, UP, SCALE_P1, SCALE_P2 }
-    private var calibrationStep = CalibrationStep.NONE
-    private var isCenterOnlyMode = false  // true = Set Center only; false = full or scale+direction wizard
-    private var calCenter: Pair<Float, Float>? = null
-    private var calUpPoint: Pair<Float, Float>? = null
-    private var calScaleP1: Pair<Float, Float>? = null
-    private var calScaleP2: Pair<Float, Float>? = null
-    private var pendingCalTap: Pair<Float, Float>? = null
     private var calibrationData: CalibrationData? = null
     private var latestToolPoint: Pair<Float, Float>? = null
     private var pendingLoadedCalibrationRestore = false
-
-    // Auto-detect center: collect AUTO_SAMPLE_TARGET frames and average them
-    private val AUTO_SAMPLE_TARGET = 30
-    private val autoSamples = mutableListOf<Pair<Float, Float>>()
-    private var isAutoCapturingCenter = false
-
-    // Rotation-based center calibration: operator rotates the spindle by hand while the
-    // detected tool position is traced, then CircleFit derives the true centerline.
-    private var isRotationMode = false
-    private var isRotationCapturing = false
-    private val rotationSamples = mutableListOf<Pair<Float, Float>>()
-    private val rotationCoverageBuckets = BooleanArray(ROTATION_COVERAGE_BUCKETS)
-    private var rotationSumX = 0.0
-    private var rotationSumY = 0.0
-    private var lastRotationFitQuality: RotationFitQuality? = null
+    // Set whenever the stored image-space target must be re-projected through a fresh
+    // mapper: launch, source switch, overlay resize. Consumed on the next valid frame.
+    private var pendingTargetRestore = false
+    private val persistTargetRunnable = Runnable { persistTargetNow() }
 
     private var simAngle = 0.0
     private var simRadiusPx = 200f
-    private var zoomFactor = ZOOM_1X
+    private var zoomFactor = 1f
 
     private var isResizingTarget = false
     private var touchDownX = 0f
@@ -115,7 +92,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     
     // Manual Locking
     private var isLocked = false
-    private var lockRequest = false
     private var trackingEnabled = true
     private var tuningPanelVisible = false
 
@@ -124,138 +100,72 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var alignmentHistoryStore: AlignmentHistoryStore
     private var latestDeltaInches: Pair<Double, Double>? = null
     private var lastAlignmentToolLabel: String = ""
-    private val analysisExecutor = Executors.newSingleThreadExecutor()
-    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private var pendingUsbRetryRunnable: Runnable? = null
 
     private val camPerm = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->
-        if (perms[Manifest.permission.CAMERA] == true) startCamera()
-    }
-
-    private val usbPermissionReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (cameraSource != CameraSource.USB || simulate) return
-            if (intent?.action != usbPermissionAction) return
-
-            val device = getUsbDeviceExtra(intent)
-            val expected = pendingUsbDeviceName
-            usbPermissionRequestInFlight = false
-            if (expected != null && device?.deviceName != expected) {
-                pendingUsbDeviceName = null
-                Log.w(
-                    TAG,
-                    "USB permission callback device changed. expected=$expected actual=${device?.deviceName}"
-                )
-                b.root.postDelayed({
-                    if (cameraSource == CameraSource.USB && !simulate) {
-                        startUsbCamera()
-                    }
-                }, USB_RECONNECT_DELAY_MS)
-                return
-            }
-            pendingUsbDeviceName = null
-
-            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-            if (!granted) {
-                Log.w(TAG, "USB permission denied; scheduling retry")
-                Toast.makeText(
-                    this@MainActivity,
-                    "USB permission denied. Retrying...",
-                    Toast.LENGTH_LONG
-                ).show()
-                scheduleUsbFragmentRetry("permission denied")
-                return
-            }
-
-            val opened = openPermittedUsbCamera(preferredDevice = device)
-            if (!opened) {
-                Log.w(TAG, "USB permission granted but no permitted UVC device was immediately available")
-                b.root.postDelayed({
-                    if (cameraSource == CameraSource.USB && !simulate) {
-                        startUsbCamera()
-                    }
-                }, USB_RECONNECT_DELAY_MS)
-            }
-        }
-    }
-
-    private val usbMonitorRecoveryReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action != AxisightApp.ACTION_USB_MONITOR_RACE) return
-            if (cameraSource != CameraSource.USB || simulate) return
-            if (usbPermissionRequestInFlight) return
-
-            stopUsbCamera()
-            b.root.postDelayed({
-                if (cameraSource == CameraSource.USB && !simulate) {
-                    startUsbCamera()
-                }
-            }, 500L)
-        }
-    }
-
-    private val usbAttachReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (cameraSource != CameraSource.USB || simulate) return
-            when (intent?.action) {
-                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                    b.root.postDelayed({
-                        if (cameraSource == CameraSource.USB && !simulate) {
-                            startUsbCamera()
-                        }
-                    }, USB_RECONNECT_DELAY_MS)
-                }
-                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                    stopUsbCamera()
-                }
-            }
-        }
+        if (perms[Manifest.permission.CAMERA] == true) startInternalCamera()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
+        applyEdgeToEdgeInsets()
         val density = resources.displayMetrics.density
         targetTapSlopPx = 18f * density
         targetEdgeTolerancePx = 24f * density
-        registerUsbMonitorRecoveryReceiverIfNeeded()
-        registerUsbAttachReceiverIfNeeded()
+        camera = buildCameraController()
 
         csvLogger = CsvLogger(this)
         calibrationStore = CalibrationStore(this)
         alignmentHistoryStore = AlignmentHistoryStore(this)
         calibrationData = calibrationStore.load()
 
-        b.rgCameraSource.setOnCheckedChangeListener { _, checkedId ->
+        b.rgCameraSource.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val newType = when (checkedId) {
+                R.id.rbUsb -> CameraSourceType.USB
+                R.id.rbWifi -> CameraSourceType.WIFI
+                else -> CameraSourceType.INTERNAL
+            }
+            camera.activeType = newType
+            calibrationStore.saveLastSource(newType.name)
             latestToolPoint = null
             latestDetectionQuality = null
             detectionFilter.reset()
+            frameAnalyzer.reset()
             coordinateMapper.invalidate()
-            applyZoom(ZOOM_1X)
+            // The target circle is stored per source in image space; re-project it once
+            // this source's first frame has refreshed the mapper.
+            cancelTargetPersist()
+            pendingTargetRestore = true
+            applyZoom(1f)
+            // Calibration is per camera source: hide the crosshair until this source's
+            // first frame lets us re-project the stored center (or decide it does not
+            // apply here). restoreLoadedCalibrationIfPending() runs from qualityTick.
+            b.overlay.clearTrueCenter()
+            calibrationData = calibrationStore.load()
+            pendingLoadedCalibrationRestore = true
             updateDeltaReadout()
             updateQualityReadout()
-            when (checkedId) {
-                R.id.rbInternal -> {
-                    cameraSource = CameraSource.INTERNAL
+            when (newType) {
+                CameraSourceType.INTERNAL -> {
                     b.wifiGroup.visibility = View.GONE
-                    stopWifiCamera()
-                    stopUsbCamera()
-                    startCamera()
+                    camera.wifi.stop()
+                    camera.usb.stop()
+                    startInternalCamera()
                 }
-                R.id.rbWifi -> {
-                    cameraSource = CameraSource.WIFI
+                CameraSourceType.WIFI -> {
                     b.wifiGroup.visibility = View.VISIBLE
-                    stopCamera()
-                    stopUsbCamera()
+                    camera.internal.stop()
+                    camera.usb.stop()
                 }
-                R.id.rbUsb -> {
-                    cameraSource = CameraSource.USB
+                CameraSourceType.USB -> {
                     b.wifiGroup.visibility = View.GONE
-                    stopCamera()
-                    stopWifiCamera()
+                    camera.internal.stop()
+                    camera.wifi.stop()
                     startUsbCamera()
                 }
             }
@@ -272,9 +182,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             simulate = checked
             coordinateMapper.invalidate()
             if (simulate) {
-                stopCamera()
-                stopWifiCamera()
-                stopUsbCamera()
+                camera.stopAll()
                 b.overlay.clearPoints()
                 b.overlay.hideSimDot()
                 b.previewView.visibility = View.INVISIBLE
@@ -284,15 +192,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 b.previewView.visibility = View.VISIBLE
                 b.overlay.hideSimDot()
                 b.overlay.clearPoints()
-                when (cameraSource) {
-                    CameraSource.INTERNAL -> startCamera()
-                    CameraSource.WIFI -> {
+                when (camera.activeType) {
+                    CameraSourceType.INTERNAL -> startInternalCamera()
+                    CameraSourceType.WIFI -> {
                         val url = b.edWifiUrl.text.toString()
                         if (url.isNotEmpty()) {
                             startWifiCamera(url)
                         }
                     }
-                    CameraSource.USB -> startUsbCamera()
+                    CameraSourceType.USB -> startUsbCamera()
                 }
             }
         }
@@ -303,23 +211,32 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             popup.menu.add(0, 1, 0, getString(R.string.cal_set_center))
             popup.menu.add(0, 2, 1, getString(R.string.cal_set_scale))
             popup.menu.add(0, 3, 2, getString(R.string.cal_set_rotation))
+            popup.menu.add(0, 4, 3, getString(R.string.cal_help))
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
-                    1 -> startCenterCalibration()
-                    2 -> startScaleCalibration()
-                    3 -> startRotationCalibration()
+                    1 -> calibrationViewModel.startCenterCalibration()
+                    2 -> if (calibrationAppliesToActiveSource()) {
+                        calibrationViewModel.startScaleCalibration()
+                    } else {
+                        // A center captured on another camera is in that camera's image space.
+                        Toast.makeText(this, getString(R.string.cal_scale_needs_center), Toast.LENGTH_LONG).show()
+                    }
+                    3 -> calibrationViewModel.startRotationCalibration()
+                    4 -> showCalibrationHelp()
                 }
                 true
             }
             popup.show()
         }
-        b.btnCalConfirm.setOnClickListener { confirmCalibrationStep() }
-        b.btnCalRetry.setOnClickListener { retryCalibrationStep() }
-        b.btnCalCancel.setOnClickListener { cancelCalibrationWizard() }
-        b.btnCalAutoCenter.setOnClickListener { startAutoCapturingCenter() }
-        b.btnCalRotationCapture.setOnClickListener {
-            if (isRotationCapturing) finishRotationCapture() else startRotationCapture()
+        b.btnCalConfirm.setOnClickListener {
+            calibrationViewModel.confirmStep(b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull())
         }
+        b.btnCalRetry.setOnClickListener { calibrationViewModel.retryStep() }
+        b.btnCalCancel.setOnClickListener { calibrationViewModel.cancelWizard() }
+        b.btnCalAutoCenter.setOnClickListener {
+            calibrationViewModel.startAutoCapture(hasLiveToolPoint = latestToolPoint != null)
+        }
+        b.btnCalRotationCapture.setOnClickListener { calibrationViewModel.toggleRotationCapture() }
         b.btnExport.setOnClickListener { view ->
             val popup = android.widget.PopupMenu(this, view)
             popup.menu.add(0, 1, 0, getString(R.string.export_points_csv))
@@ -337,43 +254,40 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         b.zoomGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (isChecked) applyZoom(zoomFactorFor(checkedId))
+            if (!isChecked) return@addOnButtonCheckedListener
+            applyZoom(
+                when (checkedId) {
+                    R.id.btnZoom2x -> 2f
+                    R.id.btnZoom5x -> 5f
+                    else -> 1f
+                }
+            )
         }
 
         b.btnLock.setOnClickListener {
             isLocked = !isLocked
-            b.btnLock.text = if (isLocked) getString(R.string.unlock) else getString(R.string.lock)
-            
+            updateLockButton()
+
             if (isLocked) {
-                 // Trigger Lock
-                 if (cameraSource == CameraSource.USB) {
-                     val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
-                     val lockedThr = frag?.lockTarget(true) ?: return@setOnClickListener
-                     Toast.makeText(this, "Locked (USB) Thr=$lockedThr", Toast.LENGTH_SHORT).show()
-                 } else if (cameraSource == CameraSource.INTERNAL) {
-                     lockRequest = true // Signal analyzer to lock on next frame
-                 }
-            } else {
-                // Unlock
-                lockRequest = false
-                updateCfg { copy(lockedThreshold = null) }
-                if (cameraSource == CameraSource.USB) {
-                     val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
-                     frag?.lockTarget(false)
+                // Threshold is sampled on the next analyzed frame of the active source.
+                when (camera.activeType) {
+                    CameraSourceType.USB -> camera.usb.requestLock()
+                    CameraSourceType.INTERNAL -> camera.internal.requestLock()
+                    CameraSourceType.WIFI -> Unit
                 }
+            } else {
+                camera.internal.cancelLockRequest()
+                camera.usb.cancelLockRequest()
+                updateCfg { copy(lockedThreshold = null) }
                 Toast.makeText(this, "Unlocked", Toast.LENGTH_SHORT).show()
             }
         }
 
-        b.btnTrackStart.setOnClickListener {
-            trackingEnabled = true
+        b.btnTrack.setOnClickListener {
+            trackingEnabled = !trackingEnabled
+            if (!trackingEnabled) detectionFilter.reset()
             updateTrackingButtons()
-        }
-
-        b.btnTrackStop.setOnClickListener {
-            trackingEnabled = false
-            detectionFilter.reset()
-            updateTrackingButtons()
+            updateQualityReadout()
         }
 
         b.btnTrackReset.setOnClickListener {
@@ -381,11 +295,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         updateTrackingButtons()
+        updateLockButton()
 
-        b.btnSettings.setOnClickListener {
-            tuningPanelVisible = !tuningPanelVisible
-            b.tuningPanel.visibility = if (tuningPanelVisible) View.VISIBLE else View.GONE
+        b.btnSettings.setOnClickListener { setTuningPanelVisible(!tuningPanelVisible) }
+        b.btnTuningClose.setOnClickListener { setTuningPanelVisible(false) }
+
+        // Keep the overlay's fit readout clear of the bottom bar and the zoom control.
+        val overlayInsetListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            val gap = resources.displayMetrics.density * 16f
+            b.overlay.bottomInset = b.bottomBar.height + b.zoomGroup.height + gap
         }
+        b.bottomBar.addOnLayoutChangeListener(overlayInsetListener)
+        b.zoomGroup.addOnLayoutChangeListener(overlayInsetListener)
 
         // Nudge buttons — move target circle center / adjust radius in view-space steps
         val nudgeStepPx = resources.displayMetrics.density * 4f  // 4dp per tap
@@ -396,24 +317,35 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         b.btnRadiusMinus.setOnClickListener { b.overlay.setTargetRadius((b.overlay.targetRadiusPx - nudgeStepPx).coerceAtLeast(4f)) }
         b.btnRadiusPlus.setOnClickListener  { b.overlay.setTargetRadius(b.overlay.targetRadiusPx + nudgeStepPx) }
 
-        b.seekCirc.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(minCircularity = (p/100.0).coerceIn(0.0,1.0)) }; updateParamsSummary(); syncUsbDetectorTuning() })
-        b.seekKstd.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(kStd = p/100.0) }; updateParamsSummary(); syncUsbDetectorTuning() })
-        b.seekContrast.setOnSeekBarChangeListener(SimpleSeek { p -> updateCfg { copy(minContrastRatio = (p/100.0).coerceIn(0.0,1.0)) }; updateParamsSummary(); syncUsbDetectorTuning() })
+        // Sliders start at the config defaults so the readout and the detector agree.
+        b.seekCirc.value = cfg.minCircularity.toFloat()
+        b.seekKstd.value = cfg.kStd.toFloat()
+        b.seekContrast.value = cfg.minContrastRatio.toFloat()
+        b.seekCirc.addOnChangeListener { _, v, _ ->
+            updateCfg { copy(minCircularity = v.toDouble().coerceIn(0.0, 1.0)) }
+            updateTuningValueLabels(); updateParamsSummary()
+        }
+        b.seekKstd.addOnChangeListener { _, v, _ ->
+            updateCfg { copy(kStd = v.toDouble().coerceAtLeast(0.0)) }
+            updateTuningValueLabels(); updateParamsSummary()
+        }
+        b.seekContrast.addOnChangeListener { _, v, _ ->
+            updateCfg { copy(minContrastRatio = v.toDouble().coerceIn(0.0, 1.0)) }
+            updateTuningValueLabels(); updateParamsSummary()
+        }
+        updateTuningValueLabels()
         b.overlay.onTargetChanged = { tx, ty, radius ->
-            // Convert view-space overlay coords to image-space for the detector
-            val (ix, iy) = if (coordinateMapper.isValid) coordinateMapper.viewToImage(tx, ty) else tx to ty
-            val ir = if (coordinateMapper.isValid) coordinateMapper.viewRadiusToImage(radius) else radius
-            updateCfg { copy(targetCenterX = ix, targetCenterY = iy, targetRadiusPx = ir) }
+            // Kept in view space; every source converts it to image space per frame.
+            targetViewRef.set(FrameAnalyzer.ViewTarget(tx, ty, radius))
+            scheduleTargetPersist()
             if (!b.edTargetRadius.hasFocus()) {
                 updatingTargetRadiusField = true
                 b.edTargetRadius.setText(String.format(Locale.US, "%.1f", radius))
                 updatingTargetRadiusField = false
             }
             updateParamsSummary()
-            val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
-            frag?.setTargetCircle(tx, ty, radius)
         }
-        b.edTargetRadius.setText(String.format(Locale.US, "%.1f", cfg.targetRadiusPx))
+        b.edTargetRadius.setText(String.format(Locale.US, "%.1f", b.overlay.targetRadiusPx))
         b.edTargetRadius.setOnEditorActionListener { v, _, _ ->
             if (!updatingTargetRadiusField) {
                 val enteredRadius = v.text?.toString()?.trim()?.toFloatOrNull()
@@ -432,9 +364,39 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
         }
         applyLoadedCalibration()
+        // The overlay rescales its target proportionally when its own size changes, but the
+        // image under it moves too (letterbox/scale), so the stretched view coordinates are
+        // only a placeholder: the image-space copy is re-projected on the next frame.
+        b.overlay.addOnLayoutChangeListener { _, l, t, r, btm, ol, ot, orr, ob ->
+            if ((r - l) != (orr - ol) || (btm - t) != (ob - ot)) {
+                cancelTargetPersist()
+                pendingTargetRestore = true
+            }
+        }
+        // Restore the operator's target circle once the overlay has a size to clamp against.
+        // The view-space copy gives an immediate placeholder; restoreTargetIfPending()
+        // replaces it with the exact image-space position after the first frame.
+        calibrationStore.loadTargetOrNull()?.let { (tx, ty, radius) ->
+            b.overlay.post {
+                b.overlay.setTargetCenter(tx, ty)
+                b.overlay.setTargetRadius(radius)
+                cancelTargetPersist()
+                pendingTargetRestore = true
+            }
+        }
         updateParamsSummary()
         updateDeltaReadout()
-        updateCalibrationPanel()
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    calibrationViewModel.state.collect { renderCalibrationPanel(it) }
+                }
+                launch {
+                    calibrationViewModel.effects.collect { handleCalibrationEffect(it) }
+                }
+            }
+        }
 
         b.edMmPerPx.setOnEditorActionListener { v, _, _ ->
             // The field shows/accepts inches-per-VIEW-pixel (what the operator sees on
@@ -453,16 +415,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
         b.edKnownMm.setText(getString(R.string.default_known_mm))
         b.edKnownMm.setOnEditorActionListener { v, _, _ ->
-            knownInches = v.text?.toString()?.toDoubleOrNull() ?: DEFAULT_KNOWN_INCHES
+            calibrationViewModel.onKnownInchesChanged(v.text?.toString()?.toDoubleOrNull())
             true
         }
 
         b.overlay.setOnTouchListener { view, ev ->
+            val calibrationActive =
+                calibrationViewModel.state.value.step != CalibrationViewModel.Step.NONE
             when (ev.action) {
                 MotionEvent.ACTION_DOWN -> {
                     val x = ev.x
                     val y = ev.y
-                    if (!handleCalibrationTap(x, y)) {
+                    if (!calibrationViewModel.handleTap(x, y)) {
                         touchDownX = x
                         touchDownY = y
                         isResizingTarget = isNearTargetEdge(x, y)
@@ -474,14 +438,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    if (calibrationStep == CalibrationStep.NONE && isResizingTarget) {
+                    if (!calibrationActive && isResizingTarget) {
                         val radius = hypot((ev.x - b.overlay.targetX).toDouble(), (ev.y - b.overlay.targetY).toDouble()).toFloat()
                         b.overlay.setTargetRadius(radius)
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (calibrationStep == CalibrationStep.NONE && !isResizingTarget) {
+                    if (!calibrationActive && !isResizingTarget) {
                         val moveDistance = hypot((ev.x - touchDownX).toDouble(), (ev.y - touchDownY).toDouble()).toFloat()
                         if (moveDistance <= targetTapSlopPx) {
                             b.overlay.setTargetCenter(ev.x, ev.y)
@@ -495,334 +459,177 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
         }
 
-        if (!simulate) ensureCameraPermission { startCamera() }
-    }
-
-    private fun startCenterCalibration() {
-        isCenterOnlyMode = true
-        resetRotationCaptureState()
-        calibrationStep = CalibrationStep.CENTER
-        calCenter = null
-        calUpPoint = null
-        calScaleP1 = null
-        calScaleP2 = null
-        pendingCalTap = null
-        updateCalibrationPanel()
-    }
-
-    private fun startScaleCalibration() {
-        // Require a center to be set first
-        val center = calibrationData?.let { it.centerX to it.centerY }
-            ?: calibrationStore.loadCenterOrNull()
-        if (center == null) {
-            Toast.makeText(this, getString(R.string.cal_scale_needs_center), Toast.LENGTH_LONG).show()
-            return
+        // Start on the source the operator used last (or USB when launched by plugging a
+        // camera in) so the stored calibration is projected through the right camera.
+        // The attach intent is sticky across recreation (rotation), so only honour it on a
+        // fresh launch; otherwise it would override whatever source the operator chose.
+        val startSource = when {
+            isUsbAttachIntent(intent) && savedInstanceState == null -> CameraSourceType.USB
+            else -> calibrationStore.loadLastSourceOrNull()
+                ?.let { name -> CameraSourceType.entries.firstOrNull { it.name == name } }
+                ?: CameraSourceType.INTERNAL
         }
-        isCenterOnlyMode = false
-        resetRotationCaptureState()
-        calCenter = center
-        calUpPoint = null
-        calScaleP1 = null
-        calScaleP2 = null
-        pendingCalTap = null
-        calibrationStep = CalibrationStep.UP
-        updateCalibrationPanel()
-    }
-
-    private fun startRotationCalibration() {
-        isCenterOnlyMode = true
-        isRotationMode = true
-        resetRotationCaptureState()
-        calibrationStep = CalibrationStep.CENTER
-        calCenter = null
-        calUpPoint = null
-        calScaleP1 = null
-        calScaleP2 = null
-        pendingCalTap = null
-        updateCalibrationPanel()
-    }
-
-    private fun resetRotationCaptureState() {
-        isRotationMode = false
-        isRotationCapturing = false
-        rotationSamples.clear()
-        rotationCoverageBuckets.fill(false)
-        rotationSumX = 0.0
-        rotationSumY = 0.0
-        lastRotationFitQuality = null
-    }
-
-    private fun startRotationCapture() {
-        isRotationCapturing = true
-        rotationSamples.clear()
-        rotationCoverageBuckets.fill(false)
-        rotationSumX = 0.0
-        rotationSumY = 0.0
-        lastRotationFitQuality = null
-        pendingCalTap = null
-        updateCalibrationPanel()
-    }
-
-    private fun finishRotationCapture() {
-        isRotationCapturing = false
-        val quality = evaluateRotationFit(rotationSamples)
-        lastRotationFitQuality = quality
-        pendingCalTap = if (quality != null && quality.acceptable) {
-            quality.centerX to quality.centerY
-        } else {
-            Toast.makeText(this, getString(R.string.calibration_rotation_quality_fail), Toast.LENGTH_LONG).show()
-            null
+        when (startSource) {
+            CameraSourceType.USB -> b.rgCameraSource.check(R.id.rbUsb)
+            CameraSourceType.WIFI -> b.rgCameraSource.check(R.id.rbWifi)
+            CameraSourceType.INTERNAL -> if (!simulate) ensureCameraPermission { startInternalCamera() }
         }
-        updateCalibrationPanel()
     }
 
-    private fun evaluateRotationFit(samples: List<Pair<Float, Float>>): RotationFitQuality? {
-        if (samples.size < MIN_ROTATION_SAMPLES) {
-            return RotationFitQuality(0f, 0f, 0.0, 0.0, samples.size, acceptable = false)
+    /** True when the persisted calibration was captured on the currently active source. */
+    private fun calibrationAppliesToActiveSource(): Boolean {
+        val source = calibrationStore.loadSourceOrNull() ?: return true // legacy data: assume yes
+        return source == camera.activeType.name
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // singleTask: a camera plugged in while we are running arrives here. If USB is
+        // already the active source the attach broadcast receiver handles the restart.
+        if (isUsbAttachIntent(intent) && b.rgCameraSource.checkedButtonId != R.id.rbUsb) {
+            b.rgCameraSource.check(R.id.rbUsb)
         }
-        val fit = CircleFit.fit(samples.map { it.first.toDouble() to it.second.toDouble() })
-            ?: return RotationFitQuality(0f, 0f, 0.0, 0.0, samples.size, acceptable = false)
-        val coverage = rotationCoverageFraction(samples, fit.cx, fit.cy)
-        val acceptable = coverage >= MIN_ROTATION_COVERAGE_FRACTION && fit.rms <= MAX_ROTATION_FIT_RMS_PX
-        return RotationFitQuality(
-            centerX = fit.cx.toFloat(),
-            centerY = fit.cy.toFloat(),
-            rms = fit.rms,
-            coverageFraction = coverage,
-            sampleCount = samples.size,
-            acceptable = acceptable
+    }
+
+    private fun isUsbAttachIntent(intent: Intent?): Boolean =
+        intent?.action == UsbManager.ACTION_USB_DEVICE_ATTACHED
+
+    /** Wires the three camera sources to this activity's shared detection state and UI. */
+    private fun buildCameraController(): CameraController {
+        val internalSource = InternalCameraSource(
+            this, b.previewView, frameAnalyzer,
+            object : InternalCameraSource.Listener {
+                override fun isAnalysisEnabled() = autoDetect && !simulate
+                override fun isTrackingEnabled() = trackingEnabled
+                override fun onToolPointDetected(point: FrameAnalyzer.ViewPoint) {
+                    this@MainActivity.onToolPointDetected(point.x, point.y, point.quality)
+                }
+                override fun onLockThresholdSampled(threshold: Int) = applyLockThreshold(threshold, "Int")
+            }
         )
-    }
 
-    private fun rotationCoverageFraction(samples: List<Pair<Float, Float>>, cx: Double, cy: Double): Double {
-        if (samples.isEmpty()) return 0.0
-        val visited = BooleanArray(ROTATION_COVERAGE_BUCKETS)
-        val bucketSizeDeg = 360.0 / ROTATION_COVERAGE_BUCKETS
-        for ((x, y) in samples) {
-            val deg = (Math.toDegrees(atan2(y - cy, x - cx)) + 360.0) % 360.0
-            val idx = (deg / bucketSizeDeg).toInt().coerceIn(0, ROTATION_COVERAGE_BUCKETS - 1)
-            visited[idx] = true
-        }
-        return visited.count { it }.toDouble() / ROTATION_COVERAGE_BUCKETS
-    }
+        val wifiSource = WifiCameraSource(
+            this, b.textureView, frameAnalyzer,
+            object : WifiCameraSource.Listener {
+                override fun isAnalysisEnabled() = autoDetect
+                override fun isTrackingEnabled() = trackingEnabled
+                override fun onToolPointDetected(point: FrameAnalyzer.ViewPoint) {
+                    this@MainActivity.onToolPointDetected(point.x, point.y, point.quality)
+                }
+                override fun onError(message: String) {
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+                }
+            }
+        )
 
-    private data class RotationFitQuality(
-        val centerX: Float,
-        val centerY: Float,
-        val rms: Double,
-        val coverageFraction: Double,
-        val sampleCount: Int,
-        val acceptable: Boolean
-    )
+        val usbController = UsbCameraController(
+            this, b.usbCameraContainer, R.id.usbCameraContainer,
+            object : UsbCameraController.Host {
+                override val isActiveSource: Boolean
+                    get() = camera.activeType == CameraSourceType.USB && !simulate
 
-    private fun handleCalibrationTap(x: Float, y: Float): Boolean {
-        if (calibrationStep == CalibrationStep.NONE) return false
-        pendingCalTap = x to y
-        updateCalibrationPanel()
-        return true
-    }
+                override fun configureFragment(fragment: UvcFragment) {
+                    // USB frames run through the same FrameAnalyzer / DetectorConfig /
+                    // CoordinateMapper as the other sources.
+                    fragment.attachAnalyzer(frameAnalyzer, object : UvcFragment.FrameListener {
+                        override fun isAnalysisEnabled() = autoDetect && !simulate
+                        override fun isTrackingEnabled() = trackingEnabled
+                        override fun onToolPointDetected(point: FrameAnalyzer.ViewPoint) {
+                            this@MainActivity.onToolPointDetected(point.x, point.y, point.quality)
+                        }
+                        override fun onLockThresholdSampled(threshold: Int) = applyLockThreshold(threshold, "USB")
+                    })
+                }
 
-    private fun confirmCalibrationStep() {
-        if (calibrationStep == CalibrationStep.NONE) return
-        val tap = pendingCalTap ?: return
-        pendingCalTap = null
+                override fun showToast(message: String) {
+                    Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+                }
 
-        when (calibrationStep) {
-            CalibrationStep.NONE -> Unit
-            CalibrationStep.CENTER -> {
-                calCenter = tap
-                if (isCenterOnlyMode) {
-                    // Save center only — crosshairs move, scale/direction unchanged.
-                    // Persist in image space (via CoordinateMapper) so calibration survives
-                    // resolution/orientation changes; the overlay crosshair still uses the
-                    // original view-space tap since it draws on screen.
-                    val (imgX, imgY) = coordinateMapper.viewToImage(tap.first, tap.second)
-                    calibrationStore.saveCenter(imgX, imgY)
-                    b.overlay.setTrueCenter(tap.first, tap.second)
-                    val existing = calibrationData
-                    if (existing != null) {
-                        val updated = existing.copy(centerX = imgX, centerY = imgY)
-                        calibrationData = updated
-                        calibrationStore.save(updated)
-                        updateDeltaReadout()
+                override fun showRecoveryAction(message: String, retry: () -> Unit) {
+                    com.google.android.material.snackbar.Snackbar.make(
+                        b.root,
+                        message,
+                        com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE
+                    ).setAction("Retry") { retry() }.show()
+                }
+
+                override fun onStopped() {
+                    if (camera.activeType == CameraSourceType.INTERNAL) {
+                        b.previewView.visibility = View.VISIBLE
                     }
-                    cancelCalibrationWizard()
-                    Toast.makeText(this, getString(R.string.cal_center_saved), Toast.LENGTH_SHORT).show()
-                    return
                 }
-                calibrationStep = CalibrationStep.UP
             }
-            CalibrationStep.UP -> {
-                val center = calCenter
-                if (center == null) {
-                    calibrationStep = CalibrationStep.CENTER
-                    Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
-                    updateCalibrationPanel()
-                    return
-                }
-                val upDist = hypot((tap.first - center.first).toDouble(), (tap.second - center.second).toDouble())
-                if (upDist < MIN_UP_DISTANCE_PX) {
-                    pendingCalTap = tap
-                    Toast.makeText(this, getString(R.string.calibration_quality_fail), Toast.LENGTH_SHORT).show()
-                    updateCalibrationPanel()
-                    return
-                }
-                calUpPoint = tap
-                calibrationStep = CalibrationStep.SCALE_P1
-            }
-            CalibrationStep.SCALE_P1 -> {
-                calScaleP1 = tap
-                calibrationStep = CalibrationStep.SCALE_P2
-            }
-            CalibrationStep.SCALE_P2 -> {
-                calScaleP2 = tap
-                tryFinalizeCalibration()
-            }
-        }
-        updateCalibrationPanel()
-    }
-
-    private fun retryCalibrationStep() {
-        if (calibrationStep == CalibrationStep.NONE) return
-        isAutoCapturingCenter = false
-        autoSamples.clear()
-        pendingCalTap = null
-        when (calibrationStep) {
-            CalibrationStep.CENTER -> {
-                calCenter = null
-                isRotationCapturing = false
-                rotationSamples.clear()
-                rotationCoverageBuckets.fill(false)
-                rotationSumX = 0.0
-                rotationSumY = 0.0
-                lastRotationFitQuality = null
-            }
-            CalibrationStep.UP -> calUpPoint = null
-            CalibrationStep.SCALE_P1 -> calScaleP1 = null
-            CalibrationStep.SCALE_P2 -> calScaleP2 = null
-            CalibrationStep.NONE -> Unit
-        }
-        updateCalibrationPanel()
-    }
-
-    private fun cancelCalibrationWizard() {
-        isAutoCapturingCenter = false
-        autoSamples.clear()
-        isCenterOnlyMode = false
-        resetRotationCaptureState()
-        calibrationStep = CalibrationStep.NONE
-        pendingCalTap = null
-        calCenter = null
-        calUpPoint = null
-        calScaleP1 = null
-        calScaleP2 = null
-        updateCalibrationPanel()
-    }
-
-    private fun tryFinalizeCalibration() {
-        val center = calCenter
-        val upPoint = calUpPoint
-        val scaleP1 = calScaleP1
-        val scaleP2 = calScaleP2
-        if (center == null || upPoint == null || scaleP1 == null || scaleP2 == null) {
-            Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val typedKnownInches = b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull()
-        if (typedKnownInches != null && typedKnownInches > 0.0) {
-            knownInches = typedKnownInches
-        }
-        if (knownInches <= 0.0) {
-            Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val quality = evaluateCalibrationQuality(center, upPoint, scaleP1, scaleP2, knownInches)
-        if (!quality.acceptable) {
-            b.txtCalQuality.text = getString(R.string.calibration_quality_fail)
-            Toast.makeText(this, getString(R.string.calibration_quality_fail), Toast.LENGTH_LONG).show()
-            return
-        }
-
-        // Persist in image space (via CoordinateMapper) so calibration survives
-        // resolution/orientation changes; quality gating above stays in view-space
-        // since it's modeling tap-finger precision, which is a screen-space concept.
-        val (imgCenterX, imgCenterY) = coordinateMapper.viewToImage(center.first, center.second)
-        val (imgUpX, imgUpY) = coordinateMapper.viewToImage(upPoint.first, upPoint.second)
-        val (imgScaleP1X, imgScaleP1Y) = coordinateMapper.viewToImage(scaleP1.first, scaleP1.second)
-        val (imgScaleP2X, imgScaleP2Y) = coordinateMapper.viewToImage(scaleP2.first, scaleP2.second)
-        val imageScaleDistancePx = hypot(
-            (imgScaleP2X - imgScaleP1X).toDouble(),
-            (imgScaleP2Y - imgScaleP1Y).toDouble()
-        ).coerceAtLeast(1.0)
-        val imageInchesPerPixel = knownInches / imageScaleDistancePx
-
-        val data = CalibrationData.fromCenterUpAndScale(
-            centerX = imgCenterX,
-            centerY = imgCenterY,
-            upPointX = imgUpX,
-            upPointY = imgUpY,
-            inchesPerPixel = imageInchesPerPixel
         )
-        if (data == null) {
-            Toast.makeText(this, getString(R.string.calibration_failed), Toast.LENGTH_SHORT).show()
-            return
+
+        return CameraController(internalSource, wifiSource, usbController)
+    }
+
+    private fun startInternalCamera() {
+        b.previewView.visibility = View.VISIBLE
+        b.textureView.visibility = View.GONE
+        camera.internal.start()
+    }
+
+    private fun startWifiCamera(url: String) {
+        if (camera.wifi.start(url)) {
+            b.previewView.visibility = View.GONE
+            b.textureView.visibility = View.VISIBLE
         }
-
-        calibrationData = data
-        inPerPx = quality.inchesPerPixel // view-space, for the on-screen in/px display
-        b.overlay.mmPerPx = inPerPx?.times(25.4)
-        b.edMmPerPx.setText(String.format(Locale.US, "%.6f", quality.inchesPerPixel))
-        calibrationStore.save(data)
-        b.overlay.setTrueCenter(center.first, center.second)
-        calibrationStep = CalibrationStep.NONE
-        pendingCalTap = null
-        updateCalibrationPanel()
-        updateParamsSummary()
-        updateDeltaReadout()
-        Toast.makeText(this, getString(R.string.calibration_complete), Toast.LENGTH_SHORT).show()
     }
 
-    private fun evaluateCalibrationQuality(
-        center: Pair<Float, Float>,
-        upPoint: Pair<Float, Float>,
-        scaleP1: Pair<Float, Float>,
-        scaleP2: Pair<Float, Float>,
-        knownInches: Double
-    ): CalibrationQuality {
-        val upDistancePx = hypot((upPoint.first - center.first).toDouble(), (upPoint.second - center.second).toDouble())
-        val scaleDistancePx = hypot((scaleP2.first - scaleP1.first).toDouble(), (scaleP2.second - scaleP1.second).toDouble())
-        val safeScalePx = scaleDistancePx.coerceAtLeast(1.0)
-        val inchesPerPixel = knownInches / safeScalePx
-
-        // Endpoint quantization estimate assuming +/-1px around each tap.
-        val scaleErrorIn = knownInches * (sqrt(2.0) / safeScalePx)
-        // Angular uncertainty estimate from 1px tap uncertainty on up vector.
-        val angularErrorRad = atan2(1.0, upDistancePx.coerceAtLeast(1.0))
-        val axisErrorAtOneIn = tan(angularErrorRad)
-        val combinedErrorIn = hypot(scaleErrorIn, axisErrorAtOneIn)
-
-        val acceptable = upDistancePx >= MIN_UP_DISTANCE_PX &&
-            scaleDistancePx >= MIN_SCALE_DISTANCE_PX &&
-            combinedErrorIn <= MAX_COMBINED_ERROR_IN
-
-        return CalibrationQuality(
-            upDistancePx = upDistancePx,
-            scaleDistancePx = scaleDistancePx,
-            inchesPerPixel = inchesPerPixel,
-            combinedErrorIn = combinedErrorIn,
-            acceptable = acceptable
-        )
+    private fun startUsbCamera() {
+        b.previewView.visibility = View.GONE
+        b.textureView.visibility = View.GONE
+        camera.usb.start()
     }
 
-    private fun updateCalibrationPanel() {
-        val active = calibrationStep != CalibrationStep.NONE
+    private fun showCalibrationHelp() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.cal_help_title))
+            .setMessage(getString(R.string.cal_help_body))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    /** Applies one-shot wizard outcomes (messages, persisted calibrations) to the UI. */
+    private fun handleCalibrationEffect(effect: CalibrationViewModel.Effect) {
+        when (effect) {
+            is CalibrationViewModel.Effect.Message -> {
+                val duration = if (effect.isLong) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+                Toast.makeText(this, getString(effect.resId), duration).show()
+            }
+            is CalibrationViewModel.Effect.CenterSaved -> {
+                calibrationStore.saveSource(camera.activeType.name)
+                b.overlay.setTrueCenter(effect.viewX, effect.viewY)
+                // null when no full calibration applies to this source (none existed, or
+                // the stored scale belonged to another camera and was dropped).
+                calibrationData = effect.updatedData
+                if (effect.updatedData == null) {
+                    inPerPx = null
+                    b.overlay.mmPerPx = null
+                    updateParamsSummary()
+                }
+                updateDeltaReadout()
+            }
+            is CalibrationViewModel.Effect.CalibrationCompleted -> {
+                calibrationStore.saveSource(camera.activeType.name)
+                calibrationData = effect.data
+                inPerPx = effect.viewInchesPerPixel // view-space, for the on-screen in/px display
+                b.overlay.mmPerPx = inPerPx?.times(25.4)
+                b.edMmPerPx.setText(String.format(Locale.US, "%.6f", effect.viewInchesPerPixel))
+                b.overlay.setTrueCenter(effect.viewCenterX, effect.viewCenterY)
+                updateParamsSummary()
+                updateDeltaReadout()
+            }
+        }
+    }
+
+    /** Renders the calibration panel and overlay markers from the wizard state. */
+    private fun renderCalibrationPanel(s: CalibrationViewModel.UiState) {
+        val active = s.step != CalibrationViewModel.Step.NONE
         b.calibrationPanel.visibility = if (active) View.VISIBLE else View.GONE
-        if (active) {
-            tuningPanelVisible = false
-            b.tuningPanel.visibility = View.GONE
-        }
+        if (active) setTuningPanelVisible(false)
         if (!active) {
             b.overlay.setCalibrationMarkers(
                 center = null,
@@ -834,30 +641,33 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             return
         }
 
-        val stepText = when (calibrationStep) {
-            CalibrationStep.NONE -> ""
-            CalibrationStep.CENTER -> if (isRotationMode) getString(R.string.calibration_step_rotation) else getString(R.string.calibration_step_center)
-            CalibrationStep.UP -> getString(R.string.calibration_step_scale_up)
-            CalibrationStep.SCALE_P1 -> getString(R.string.calibration_step_scale_1)
-            CalibrationStep.SCALE_P2 -> getString(R.string.calibration_step_scale_2)
+        val stepText = when (s.step) {
+            CalibrationViewModel.Step.NONE -> ""
+            CalibrationViewModel.Step.CENTER -> if (s.isRotationMode) getString(R.string.calibration_step_rotation) else getString(R.string.calibration_step_center)
+            CalibrationViewModel.Step.UP -> getString(R.string.calibration_step_scale_up)
+            CalibrationViewModel.Step.SCALE_P1 -> getString(R.string.calibration_step_scale_1)
+            CalibrationViewModel.Step.SCALE_P2 -> getString(R.string.calibration_step_scale_2)
         }
         b.txtCalStep.text = stepText
 
+        val isRotationCenterStep = s.step == CalibrationViewModel.Step.CENTER && s.isRotationMode
         b.txtCalCapture.text = when {
-            calibrationStep == CalibrationStep.CENTER && isRotationMode && isRotationCapturing ->
-                b.txtCalCapture.text // left as-is; updated live per-frame in onToolPointDetected
-            calibrationStep == CalibrationStep.CENTER && isRotationMode && pendingCalTap != null -> {
-                val (x, y) = pendingCalTap!!
+            isRotationCenterStep && s.isRotationCapturing ->
+                getString(R.string.calibration_rotation_collecting, s.rotationSampleCount, s.rotationCoveragePercent)
+            isRotationCenterStep && s.pendingTap != null -> {
+                val (x, y) = s.pendingTap
                 getString(R.string.calibration_point_captured, x, y)
             }
-            calibrationStep == CalibrationStep.CENTER && isRotationMode -> getString(R.string.calibration_rotation_idle)
-            else -> pendingCalTap?.let { (x, y) -> getString(R.string.calibration_point_captured, x, y) }
+            isRotationCenterStep -> getString(R.string.calibration_rotation_idle)
+            s.isAutoCapturingCenter ->
+                getString(R.string.calibration_auto_collecting, s.autoSampleCount, CalibrationViewModel.AUTO_SAMPLE_TARGET)
+            else -> s.pendingTap?.let { (x, y) -> getString(R.string.calibration_point_captured, x, y) }
                 ?: getString(R.string.calibration_step_wait_tap)
         }
 
         val qualityText = when {
-            calibrationStep == CalibrationStep.CENTER && isRotationMode && lastRotationFitQuality != null -> {
-                val q = lastRotationFitQuality!!
+            isRotationCenterStep && s.rotationFitQuality != null -> {
+                val q = s.rotationFitQuality
                 getString(
                     R.string.calibration_rotation_quality_value,
                     q.sampleCount,
@@ -865,14 +675,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     q.rms
                 )
             }
-            calibrationStep == CalibrationStep.SCALE_P2 && calCenter != null && calUpPoint != null && calScaleP1 != null && pendingCalTap != null -> {
+            s.step == CalibrationViewModel.Step.SCALE_P2 && s.center != null && s.upPoint != null && s.scaleP1 != null && s.pendingTap != null -> {
                 val typedKnownInches = b.edKnownMm.text?.toString()?.trim()?.toDoubleOrNull()
-                val useKnown = if (typedKnownInches != null && typedKnownInches > 0.0) typedKnownInches else knownInches
-                val q = evaluateCalibrationQuality(
-                    center = calCenter!!,
-                    upPoint = calUpPoint!!,
-                    scaleP1 = calScaleP1!!,
-                    scaleP2 = pendingCalTap!!,
+                val useKnown = if (typedKnownInches != null && typedKnownInches > 0.0) typedKnownInches else s.knownInches
+                val q = CalibrationQualityEvaluator.evaluate(
+                    center = s.center,
+                    upPoint = s.upPoint,
+                    scaleP1 = s.scaleP1,
+                    scaleP2 = s.pendingTap,
                     knownInches = useKnown
                 )
                 getString(
@@ -885,36 +695,28 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             else -> getString(R.string.calibration_quality_pending)
         }
         b.txtCalQuality.text = qualityText
-        b.btnCalConfirm.isEnabled = pendingCalTap != null && (!isRotationMode || lastRotationFitQuality?.acceptable == true)
-        val showAutoBtn = calibrationStep == CalibrationStep.CENTER && isCenterOnlyMode && !isRotationMode
+        b.btnCalConfirm.isEnabled = s.pendingTap != null && (!s.isRotationMode || s.rotationFitQuality?.acceptable == true)
+        val showAutoBtn = s.step == CalibrationViewModel.Step.CENTER && s.isCenterOnlyMode && !s.isRotationMode
         b.btnCalAutoCenter.visibility = if (showAutoBtn) View.VISIBLE else View.GONE
-        if (showAutoBtn) b.btnCalAutoCenter.isEnabled = !isAutoCapturingCenter
-        val showRotationBtn = calibrationStep == CalibrationStep.CENTER && isRotationMode
+        if (showAutoBtn) b.btnCalAutoCenter.isEnabled = !s.isAutoCapturingCenter
+        val showRotationBtn = s.step == CalibrationViewModel.Step.CENTER && s.isRotationMode
         b.btnCalRotationCapture.visibility = if (showRotationBtn) View.VISIBLE else View.GONE
         if (showRotationBtn) {
             b.btnCalRotationCapture.isEnabled = true
-            b.btnCalRotationCapture.text = if (isRotationCapturing) {
+            b.btnCalRotationCapture.text = if (s.isRotationCapturing) {
                 getString(R.string.calibration_rotation_finish)
             } else {
                 getString(R.string.calibration_rotation_start)
             }
         }
         b.overlay.setCalibrationMarkers(
-            center = calCenter,
-            up = calUpPoint,
-            scaleP1 = calScaleP1,
-            scaleP2 = calScaleP2,
-            pending = pendingCalTap
+            center = s.center,
+            up = s.upPoint,
+            scaleP1 = s.scaleP1,
+            scaleP2 = s.scaleP2,
+            pending = s.pendingTap
         )
     }
-
-    private data class CalibrationQuality(
-        val upDistancePx: Double,
-        val scaleDistancePx: Double,
-        val inchesPerPixel: Double,
-        val combinedErrorIn: Double,
-        val acceptable: Boolean
-    )
 
     private fun applyLoadedCalibration() {
         // Stored calibration/center is in image space, but restoring the on-screen
@@ -928,6 +730,16 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun restoreLoadedCalibrationIfPending() {
         if (!pendingLoadedCalibrationRestore || !coordinateMapper.isValid) return
         pendingLoadedCalibrationRestore = false
+        if (!calibrationAppliesToActiveSource()) {
+            // Captured on another camera: keep it stored, but do not show or use it here.
+            calibrationData = null
+            inPerPx = null
+            b.overlay.mmPerPx = null
+            b.overlay.clearTrueCenter()
+            updateParamsSummary()
+            updateDeltaReadout()
+            return
+        }
         val data = calibrationData
         if (data != null) {
             val viewCenter = coordinateMapper.imageToView(data.centerX, data.centerY)
@@ -947,57 +759,61 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         updateParamsSummary()
     }
 
+    /**
+     * Target-circle persistence. The circle is saved in two forms: view space (immediate
+     * placeholder on next launch) and image space tagged with the camera source (exact,
+     * survives rotation/letterbox changes, re-projected through the live mapper). Saves
+     * are debounced so dragging the circle does not rewrite SharedPreferences per
+     * touch-move event.
+     */
+    private fun scheduleTargetPersist() {
+        b.root.removeCallbacks(persistTargetRunnable)
+        b.root.postDelayed(persistTargetRunnable, TARGET_PERSIST_DEBOUNCE_MS)
+    }
+
+    private fun cancelTargetPersist() {
+        b.root.removeCallbacks(persistTargetRunnable)
+    }
+
+    private fun persistTargetNow() {
+        if (!b.overlay.targetInitialized) return
+        val tx = b.overlay.targetX
+        val ty = b.overlay.targetY
+        val radius = b.overlay.targetRadiusPx
+        calibrationStore.saveTarget(tx, ty, radius)
+        // Only trust the mapper for this source's current geometry: not while a restore is
+        // pending (mapper may still describe the previous layout/source) and not in sim.
+        if (coordinateMapper.isValid && !pendingTargetRestore && !simulate) {
+            val (ix, iy) = coordinateMapper.viewToImage(tx, ty)
+            calibrationStore.saveImageTarget(ix, iy, coordinateMapper.viewRadiusToImage(radius), camera.activeType.name)
+        }
+    }
+
+    private fun restoreTargetIfPending() {
+        if (!pendingTargetRestore || !coordinateMapper.isValid || simulate) return
+        pendingTargetRestore = false
+        val stored = calibrationStore.loadImageTargetOrNull()
+        if (stored != null && stored.source == camera.activeType.name) {
+            val (vx, vy) = coordinateMapper.imageToView(stored.x, stored.y)
+            b.overlay.setTargetCenter(vx, vy)
+            b.overlay.setTargetRadius(coordinateMapper.imageRadiusToView(stored.radiusPx))
+        } else if (b.overlay.targetInitialized) {
+            // No image-space copy for this source yet: adopt the current circle as-is.
+            scheduleTargetPersist()
+        }
+    }
+
     private fun onToolPointDetected(x: Float, y: Float, quality: DetectionQuality? = null) {
         restoreLoadedCalibrationIfPending()
+        restoreTargetIfPending()
         b.overlay.addPoint(x, y)
         latestToolPoint = x to y
+        latestDetectionAtMs = SystemClock.elapsedRealtime()
         if (quality != null) latestDetectionQuality = quality
-        if (isRotationCapturing) {
-            rotationSamples.add(x to y)
-            rotationSumX += x
-            rotationSumY += y
-            if (rotationSamples.size >= 3) {
-                val meanX = rotationSumX / rotationSamples.size
-                val meanY = rotationSumY / rotationSamples.size
-                val bucketSizeDeg = 360.0 / ROTATION_COVERAGE_BUCKETS
-                val deg = (Math.toDegrees(atan2(y - meanY, x - meanX)) + 360.0) % 360.0
-                val idx = (deg / bucketSizeDeg).toInt().coerceIn(0, ROTATION_COVERAGE_BUCKETS - 1)
-                rotationCoverageBuckets[idx] = true
-            }
-            val coveragePct = (rotationCoverageBuckets.count { it }.toDouble() / ROTATION_COVERAGE_BUCKETS * 100).roundToInt()
-            b.txtCalCapture.text = getString(R.string.calibration_rotation_collecting, rotationSamples.size, coveragePct)
-            if (rotationSamples.size >= MAX_ROTATION_SAMPLES) finishRotationCapture()
-            return
-        }
-        if (isAutoCapturingCenter) {
-            autoSamples.add(x to y)
-            b.txtCalCapture.text = getString(R.string.calibration_auto_collecting, autoSamples.size, AUTO_SAMPLE_TARGET)
-            if (autoSamples.size >= AUTO_SAMPLE_TARGET) finishAutoCapture()
-            return
-        }
+        // Rotation/auto-center captures consume the point; panel text updates via state.
+        if (calibrationViewModel.onToolPoint(x, y)) return
         updateDeltaReadout()
         updateQualityReadout()
-    }
-
-    private fun startAutoCapturingCenter() {
-        if (latestToolPoint == null) {
-            Toast.makeText(this, getString(R.string.calibration_auto_no_tool), Toast.LENGTH_SHORT).show()
-            return
-        }
-        autoSamples.clear()
-        isAutoCapturingCenter = true
-        b.btnCalAutoCenter.isEnabled = false
-        b.txtCalCapture.text = getString(R.string.calibration_auto_collecting, 0, AUTO_SAMPLE_TARGET)
-    }
-
-    private fun finishAutoCapture() {
-        isAutoCapturingCenter = false
-        val avgX = autoSamples.map { it.first }.average().toFloat()
-        val avgY = autoSamples.map { it.second }.average().toFloat()
-        autoSamples.clear()
-        pendingCalTap = avgX to avgY
-        updateCalibrationPanel()
-        updateDeltaReadout()
     }
 
     /**
@@ -1006,41 +822,83 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
      * view's own unscaled local space, so calibration taps, target-circle dragging, and
      * detection math all keep working unmodified regardless of zoom level.
      */
-    private fun zoomFactorFor(buttonId: Int): Float = when (buttonId) {
-        R.id.btnZoom2x -> ZOOM_2X
-        R.id.btnZoom5x -> ZOOM_5X
-        else -> ZOOM_1X
-    }
-
-    private fun zoomButtonFor(factor: Float): Int = when (factor) {
-        ZOOM_2X -> R.id.btnZoom2x
-        ZOOM_5X -> R.id.btnZoom5x
-        else -> R.id.btnZoom1x
-    }
-
     private fun applyZoom(factor: Float) {
         zoomFactor = factor
-        // Keep the toggle in sync when zoom is reset programmatically (e.g. on source switch).
-        val wanted = zoomButtonFor(factor)
-        if (b.zoomGroup.checkedButtonId != wanted) b.zoomGroup.check(wanted)
         for (v in listOf(b.previewView, b.textureView, b.usbCameraContainer, b.overlay)) {
             v.pivotX = v.width / 2f
             v.pivotY = v.height / 2f
             v.scaleX = factor
             v.scaleY = factor
         }
+        val id = when (factor) {
+            2f -> R.id.btnZoom2x
+            5f -> R.id.btnZoom5x
+            else -> R.id.btnZoom1x
+        }
+        if (b.zoomGroup.checkedButtonId != id) b.zoomGroup.check(id)
     }
 
-    /** USB frames are detected in [com.etrsystems.axisight.ui.UvcFragment]'s own detector
-     *  config, independent of [cfg] — push tuning-slider changes there too when USB is live. */
-    private fun syncUsbDetectorTuning() {
-        val frag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer) as? com.etrsystems.axisight.ui.UvcFragment
-        frag?.setDetectorTuning(cfg.minCircularity, cfg.kStd, cfg.minContrastRatio)
+    private fun setTuningPanelVisible(visible: Boolean) {
+        tuningPanelVisible = visible
+        b.tuningPanel.visibility = if (visible) View.VISIBLE else View.GONE
+    }
+
+    private fun updateTuningValueLabels() {
+        b.txtCircVal.text = String.format(Locale.US, "%.2f", cfg.minCircularity)
+        b.txtKstdVal.text = String.format(Locale.US, "%.2f", cfg.kStd)
+        b.txtContrastVal.text = String.format(Locale.US, "%.2f", cfg.minContrastRatio)
+    }
+
+    private fun updateLockButton() {
+        val accent = ContextCompat.getColor(this, R.color.axisight_caution)
+        val neutral = ContextCompat.getColor(this, R.color.axisight_text)
+        b.btnLock.text = getString(if (isLocked) R.string.unlock else R.string.lock)
+        b.btnLock.setIconResource(if (isLocked) R.drawable.ic_lock else R.drawable.ic_lock_open)
+        b.btnLock.iconTint = android.content.res.ColorStateList.valueOf(if (isLocked) accent else neutral)
+        b.btnLock.setTextColor(if (isLocked) accent else neutral)
+    }
+
+    /** Applies a lock threshold sampled on a source's analysis thread to the shared config. */
+    private fun applyLockThreshold(threshold: Int, sourceTag: String) {
+        updateCfg { copy(lockedThreshold = threshold) }
+        runOnUiThread {
+            Toast.makeText(this, "Locked ($sourceTag) Thr=$threshold", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * targetSdk 35+ draws edge-to-edge. The camera preview stays full-bleed, but the
+     * top strip and bottom bar are padded by the system-bar/cutout insets so controls
+     * never sit under the status bar or the gesture-navigation area.
+     */
+    private fun applyEdgeToEdgeInsets() {
+        val topBase = intArrayOf(b.topStrip.paddingLeft, b.topStrip.paddingTop, b.topStrip.paddingRight)
+        val bottomBase = intArrayOf(b.bottomBar.paddingLeft, b.bottomBar.paddingBottom, b.bottomBar.paddingRight)
+        ViewCompat.setOnApplyWindowInsetsListener(b.root) { _, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            b.topStrip.updatePadding(
+                left = topBase[0] + bars.left,
+                top = topBase[1] + bars.top,
+                right = topBase[2] + bars.right
+            )
+            b.bottomBar.updatePadding(
+                left = bottomBase[0] + bars.left,
+                bottom = bottomBase[1] + bars.bottom,
+                right = bottomBase[2] + bars.right
+            )
+            insets
+        }
     }
 
     private fun updateParamsSummary() {
         val inText = inPerPx?.let { String.format(Locale.US, "%.6f", it) } ?: getString(R.string.unset_value)
-        val radiusText = String.format(Locale.US, "%.1f", cfg.targetRadiusPx)
+        val radiusText = if (b.overlay.targetInitialized) {
+            String.format(Locale.US, "%.1f", b.overlay.targetRadiusPx)
+        } else {
+            getString(R.string.unset_value)
+        }
         val circText = String.format(Locale.US, "%.2f", cfg.minCircularity)
         val kStdText = String.format(Locale.US, "%.2f", cfg.kStd)
         val contrastText = String.format(Locale.US, "%.2f", cfg.minContrastRatio)
@@ -1083,10 +941,43 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         return (circMargin + contrastMargin) / 2.0 * 100.0
     }
 
+    /** Why nothing is being detected right now, phrased as what to do about it. */
+    private fun noDetectionHint(): String {
+        if (!b.overlay.targetInitialized) return getString(R.string.quality_hint_place_target)
+        if (!trackingEnabled) return getString(R.string.quality_hint_tracking_stopped)
+        val failure = frameAnalyzer.lastFailure ?: return getString(R.string.quality_hint_no_frames)
+        val resId = when (failure.reason) {
+            FailureReason.NO_DATA -> R.string.quality_hint_no_frames
+            FailureReason.NO_DARK_PIXELS -> R.string.quality_hint_no_dark
+            FailureReason.TOO_SMALL -> R.string.quality_hint_too_small
+            FailureReason.TOO_LARGE -> R.string.quality_hint_too_large
+            FailureReason.NOT_CIRCULAR -> R.string.quality_hint_not_circular
+            FailureReason.LOW_CONTRAST -> R.string.quality_hint_low_contrast
+            FailureReason.JUMP_TOO_LARGE, FailureReason.NOT_CONFIRMED -> R.string.quality_hint_confirming
+        }
+        return getString(resId)
+    }
+
+    /**
+     * Housekeeping tick: restores the persisted calibration crosshair as soon as the
+     * mapper has seen a frame (no detection required), and refreshes the "no detection"
+     * hint while nothing is being detected.
+     */
+    private val qualityTick = object : Runnable {
+        override fun run() {
+            restoreLoadedCalibrationIfPending()
+            restoreTargetIfPending()
+            val stale = SystemClock.elapsedRealtime() - latestDetectionAtMs > DETECTION_STALE_MS
+            if (latestDetectionQuality == null || stale) updateQualityReadout()
+            b.root.postDelayed(this, QUALITY_TICK_MS)
+        }
+    }
+
     private fun updateQualityReadout() {
-        val quality = latestDetectionQuality
+        val fresh = SystemClock.elapsedRealtime() - latestDetectionAtMs <= DETECTION_STALE_MS
+        val quality = latestDetectionQuality?.takeIf { fresh }
         if (quality == null) {
-            b.txtQuality.text = getString(R.string.quality_no_signal)
+            b.txtQuality.text = getString(R.string.quality_no_signal_reason, noDetectionHint())
             return
         }
 
@@ -1150,7 +1041,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     AlignmentRecord(
                         timestampMs = System.currentTimeMillis(),
                         toolLabel = label,
-                        cameraSource = cameraSource.name,
+                        cameraSource = camera.activeType.name,
                         dxIn = delta.first,
                         dyIn = delta.second,
                         fitRmsPx = b.overlay.lastFitResult?.rms
@@ -1177,418 +1068,26 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     override fun onResume() {
         super.onResume()
+        b.root.removeCallbacks(qualityTick)
+        b.root.post(qualityTick)
     }
 
     override fun onPause() {
+        b.root.removeCallbacks(qualityTick)
+        // Flush a debounced target save so nothing is lost if the process is killed.
+        if (b.root.removeCallbacks(persistTargetRunnable)) persistTargetNow()
         super.onPause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        stopCamera()
-        stopWifiCamera()
-        stopUsbCamera()
-        unregisterUsbPermissionReceiverIfNeeded()
-        unregisterUsbMonitorRecoveryReceiverIfNeeded()
-        unregisterUsbAttachReceiverIfNeeded()
-        pendingUsbRetryRunnable?.let { mainHandler.removeCallbacks(it) }
-        analysisExecutor.shutdown()
+        if (::camera.isInitialized) camera.dispose()
     }
 
     private fun ensureCameraPermission(onGranted: () -> Unit) {
         val cam = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         if (cam) onGranted()
         else camPerm.launch(arrayOf(Manifest.permission.CAMERA))
-    }
-
-    private fun startCamera() {
-        b.previewView.visibility = View.VISIBLE
-        b.textureView.visibility = View.GONE
-        try {
-            val providerFuture = ProcessCameraProvider.getInstance(this)
-            providerFuture.addListener({
-                try {
-                    cameraProvider = providerFuture.get()
-                    bindUseCases()
-                } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "Camera initialization failed: ${e.message}", Toast.LENGTH_LONG).show()
-                    android.util.Log.e("MainActivity", "Failed to get camera provider", e)
-                }
-            }, ContextCompat.getMainExecutor(this))
-        } catch (e: Exception) {
-            Toast.makeText(this, "Camera setup error: ${e.message}", Toast.LENGTH_LONG).show()
-            android.util.Log.e("MainActivity", "startCamera failed", e)
-        }
-    }
-
-    private fun stopCamera() {
-        cameraProvider?.unbindAll()
-        imageAnalyzer = null
-    }
-
-    private fun bindUseCases() {
-        val provider = cameraProvider ?: return
-        try {
-            provider.unbindAll()
-
-            val preview = Preview.Builder().build().apply {
-                setSurfaceProvider(b.previewView.surfaceProvider)
-            }
-
-            imageAnalyzer = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also { analysis ->
-                    analysis.setAnalyzer(analysisExecutor) { image ->
-                        try {
-                            if (autoDetect && !simulate && cameraSource == CameraSource.INTERNAL) {
-                                // Manual Lock Request
-                                if (lockRequest) {
-                                    lockRequest = false
-                                    // Sample center pixel from ImageProxy (YUV_420_888)
-                                    // Y plane is first. Use duplicate() to avoid mutating the
-                                    // shared buffer position before passing to BlobDetector.
-                                    val yPlane = image.planes[0].buffer.duplicate()
-                                    val w = image.width
-                                    val h = image.height
-                                    val cx = w / 2
-                                    val cy = h / 2
-                                    val rowStride = image.planes[0].rowStride
-                                    val pixelStride = image.planes[0].pixelStride
-                                    val offset = (cy * rowStride) + (cx * pixelStride)
-                                    if (offset < yPlane.remaining()) {
-                                        yPlane.position(offset)
-                                        val lum = yPlane.get().toInt() and 0xFF
-                                        val margin = 30
-                                        val thr = (lum + margin).coerceIn(0, 255)
-                                        updateCfg { copy(lockedThreshold = thr) }
-                                        runOnUiThread {
-                                            Toast.makeText(this@MainActivity, "Locked (Int) Thr=$thr", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                }
-
-                                val snapshot = cfg
-                                val raw = BlobDetector.detectDarkDotCenter(image, snapshot)
-                                val result = detectionFilter.filter(raw, snapshot)
-                                if (result is DetectionResult.Success && trackingEnabled) {
-                                    val previewW = b.previewView.width
-                                    val previewH = b.previewView.height
-                                    coordinateMapper.update(
-                                        image.width, image.height,
-                                        image.imageInfo.rotationDegrees,
-                                        previewW, previewH
-                                    )
-                                    val (vx, vy) = coordinateMapper.imageToView(result.x, result.y)
-                                    val quality = DetectionQuality(result.circularity, result.contrastRatio, result.sharpness)
-                                    runOnUiThread { onToolPointDetected(vx, vy, quality) }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.e("MainActivity", "Image analysis failed", e)
-                        } finally {
-                            image.close()
-                        }
-                    }
-                }
-
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-            provider.bindToLifecycle(this, cameraSelector, preview, imageAnalyzer)
-        } catch (e: Exception) {
-            Toast.makeText(this, "Camera binding failed: ${e.message}", Toast.LENGTH_LONG).show()
-            android.util.Log.e("MainActivity", "bindUseCases failed", e)
-        }
-    }
-
-    @UnstableApi
-    private fun startWifiCamera(url: String) {
-        try {
-            // Validate URL format
-            if (!isValidRtspUrl(url)) {
-                Toast.makeText(this, "Invalid RTSP URL. Expected format: rtsp://...", Toast.LENGTH_LONG).show()
-                return
-            }
-
-            b.previewView.visibility = View.GONE
-            b.textureView.visibility = View.VISIBLE
-            b.textureView.surfaceTextureListener = this
-
-            stopWifiCamera() // Clean up any existing player
-
-            exoPlayer = ExoPlayer.Builder(this).build()
-            b.textureView.surfaceTexture?.let {
-                exoPlayer?.setVideoSurface(Surface(it))
-            }
-
-            val mediaSource = RtspMediaSource.Factory().createMediaSource(MediaItem.fromUri(url))
-            exoPlayer?.setMediaSource(mediaSource)
-            exoPlayer?.prepare()
-            exoPlayer?.play()
-        } catch (e: Exception) {
-            Toast.makeText(this, "WiFi camera error: ${e.message}", Toast.LENGTH_LONG).show()
-            android.util.Log.e("MainActivity", "WiFi camera start failed", e)
-            stopWifiCamera()
-        }
-    }
-
-    /**
-     * Validates RTSP URL format to prevent injection/malformed URLs
-     */
-    private fun isValidRtspUrl(url: String): Boolean {
-        return try {
-            val uri = android.net.Uri.parse(url)
-            val scheme = uri.scheme?.lowercase() ?: return false
-            scheme in listOf("rtsp", "rtsps") && uri.host != null
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun stopWifiCamera() {
-        try {
-            exoPlayer?.run {
-                clearVideoSurface()
-                stop()
-                release()
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Error stopping WiFi camera", e)
-        } finally {
-            exoPlayer = null
-        }
-    }
-
-    private fun startUsbCamera() {
-        try {
-            b.previewView.visibility = View.GONE
-            b.textureView.visibility = View.GONE
-            b.usbCameraContainer.visibility = View.VISIBLE
-
-            val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
-            val uvcDevice = usbManager.deviceList.values.firstOrNull { isUvcDevice(it) }
-            if (uvcDevice == null) {
-                b.usbCameraContainer.visibility = View.GONE
-                Toast.makeText(this, "No USB camera detected.", Toast.LENGTH_LONG).show()
-                return
-            }
-
-            if (!usbManager.hasPermission(uvcDevice)) {
-                if (usbPermissionRequestInFlight) {
-                    return
-                }
-                val now = SystemClock.elapsedRealtime()
-                if (now - lastUsbPermissionRequestMs < USB_PERMISSION_RETRY_COOLDOWN_MS) {
-                    return
-                }
-                b.usbCameraContainer.visibility = View.GONE
-                usbPermissionRequestInFlight = true
-                lastUsbPermissionRequestMs = now
-                requestUsbPermission(usbManager, uvcDevice)
-                Toast.makeText(this, "Grant USB permission to continue.", Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            usbPermissionRequestInFlight = false
-            showUsbCameraFragment(uvcDevice)
-        } catch (e: Exception) {
-            usbPermissionRequestInFlight = false
-            Toast.makeText(this, "USB camera error: ${e.message}", Toast.LENGTH_LONG).show()
-            android.util.Log.e("MainActivity", "USB camera start failed", e)
-            stopUsbCamera()
-        }
-    }
-
-    private fun openPermittedUsbCamera(preferredDevice: UsbDevice?): Boolean {
-        val usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
-        val chosen = sequenceOf(preferredDevice)
-            .filterNotNull()
-            .firstOrNull { isUvcDevice(it) && usbManager.hasPermission(it) }
-            ?: usbManager.deviceList.values.firstOrNull { isUvcDevice(it) && usbManager.hasPermission(it) }
-
-        if (chosen == null) {
-            return false
-        }
-        showUsbCameraFragment(chosen)
-        return true
-    }
-
-    private fun showUsbCameraFragment(device: UsbDevice) {
-        b.previewView.visibility = View.GONE
-        b.textureView.visibility = View.GONE
-        b.usbCameraContainer.visibility = View.VISIBLE
-
-        val uvcFragment = com.etrsystems.axisight.ui.UvcFragment.newInstance(
-            vendorId = device.vendorId,
-            productId = device.productId,
-            deviceName = device.deviceName
-        )
-        uvcFragment.setTargetCircle(
-            x = b.overlay.targetX,
-            y = b.overlay.targetY,
-            radiusPx = b.overlay.targetRadiusPx
-        )
-        uvcFragment.setDetectorTuning(cfg.minCircularity, cfg.kStd, cfg.minContrastRatio)
-        uvcFragment.setDetectionCallback(object : com.etrsystems.axisight.ui.UvcFragment.DetectionCallback {
-            override fun onPointDetected(x: Float, y: Float, circularity: Double, contrastRatio: Double, sharpness: Double) {
-                if (autoDetect && !simulate && trackingEnabled) {
-                    onToolPointDetected(x, y, DetectionQuality(circularity, contrastRatio, sharpness))
-                }
-            }
-        })
-        usbFragmentRetryCount = 0
-        uvcFragment.setCameraStateListener(object : com.etrsystems.axisight.ui.UvcFragment.CameraStateListener {
-            override fun onUsbCameraOpened() {
-                usbFragmentRetryCount = 0
-                Log.i(TAG, "USB camera opened in MainActivity")
-            }
-            override fun onUsbCameraClosed() {
-                Log.w(TAG, "USB camera closed in MainActivity (retry $usbFragmentRetryCount)")
-                scheduleUsbFragmentRetry("camera closed")
-            }
-            override fun onUsbCameraError(message: String?) {
-                Log.e(TAG, "USB camera error in MainActivity: $message (retry $usbFragmentRetryCount)")
-                scheduleUsbFragmentRetry("camera error: $message")
-            }
-        })
-
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.usbCameraContainer, uvcFragment)
-            .commit()
-    }
-
-    private fun requestUsbPermission(usbManager: UsbManager, device: UsbDevice) {
-        registerUsbPermissionReceiverIfNeeded()
-        pendingUsbDeviceName = device.deviceName
-
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        val permissionIntent = PendingIntent.getBroadcast(
-            this,
-            1001,
-            Intent(usbPermissionAction).setPackage(packageName),
-            flags
-        )
-        usbManager.requestPermission(device, permissionIntent)
-    }
-
-    private fun registerUsbPermissionReceiverIfNeeded() {
-        if (usbPermissionReceiverRegistered) return
-        val filter = IntentFilter(usbPermissionAction)
-        ContextCompat.registerReceiver(
-            this, usbPermissionReceiver, filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        usbPermissionReceiverRegistered = true
-    }
-
-    private fun registerUsbMonitorRecoveryReceiverIfNeeded() {
-        if (usbRecoveryReceiverRegistered) return
-        val filter = IntentFilter(AxisightApp.ACTION_USB_MONITOR_RACE)
-        androidx.core.content.ContextCompat.registerReceiver(
-            this, usbMonitorRecoveryReceiver, filter,
-            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        usbRecoveryReceiverRegistered = true
-    }
-
-    private fun registerUsbAttachReceiverIfNeeded() {
-        if (usbAttachReceiverRegistered) return
-        val filter = IntentFilter().apply {
-            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
-            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
-        }
-        ContextCompat.registerReceiver(
-            this, usbAttachReceiver, filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        usbAttachReceiverRegistered = true
-    }
-
-    private fun unregisterUsbPermissionReceiverIfNeeded() {
-        if (!usbPermissionReceiverRegistered) return
-        try {
-            unregisterReceiver(usbPermissionReceiver)
-        } catch (_: IllegalArgumentException) {
-            // Receiver may already be unregistered by lifecycle races.
-        } finally {
-            usbPermissionReceiverRegistered = false
-            pendingUsbDeviceName = null
-        }
-    }
-
-    private fun unregisterUsbMonitorRecoveryReceiverIfNeeded() {
-        if (!usbRecoveryReceiverRegistered) return
-        try {
-            unregisterReceiver(usbMonitorRecoveryReceiver)
-        } catch (_: IllegalArgumentException) {
-            // Receiver may already be unregistered by lifecycle races.
-        } finally {
-            usbRecoveryReceiverRegistered = false
-        }
-    }
-
-    private fun unregisterUsbAttachReceiverIfNeeded() {
-        if (!usbAttachReceiverRegistered) return
-        try {
-            unregisterReceiver(usbAttachReceiver)
-        } catch (_: IllegalArgumentException) {
-            // Receiver may already be unregistered by lifecycle races.
-        } finally {
-            usbAttachReceiverRegistered = false
-        }
-    }
-
-    private fun getUsbDeviceExtra(intent: Intent): UsbDevice? =
-        UsbDeviceUtils.getUsbDeviceExtra(intent)
-
-    private fun isUvcDevice(device: UsbDevice): Boolean =
-        UsbDeviceUtils.isUvcDevice(device)
-
-    private fun stopUsbCamera() {
-        try {
-            usbPermissionRequestInFlight = false
-            pendingUsbDeviceName = null
-            b.usbCameraContainer.visibility = View.GONE
-            val currentFrag = supportFragmentManager.findFragmentById(R.id.usbCameraContainer)
-            if (currentFrag != null) {
-                 supportFragmentManager.beginTransaction()
-                    .remove(currentFrag)
-                    .commitAllowingStateLoss()
-            }
-            if (cameraSource == CameraSource.INTERNAL) {
-                 b.previewView.visibility = View.VISIBLE
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Error stopping USB camera", e)
-        }
-    }
-
-
-    private fun scheduleUsbFragmentRetry(reason: String) {
-        if (isFinishing || isDestroyed) return
-        if (cameraSource != CameraSource.USB || simulate) return
-        if (usbFragmentRetryCount >= MAX_USB_FRAGMENT_RETRIES) {
-            Log.e(TAG, "USB fragment retries exhausted in MainActivity. reason=$reason")
-            usbFragmentRetryCount = 0
-            com.google.android.material.snackbar.Snackbar.make(
-                b.root,
-                "USB camera could not reconnect. Replug it, or tap Retry.",
-                com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE
-            ).setAction("Retry") {
-                if (cameraSource == CameraSource.USB && !simulate) startUsbCamera()
-            }.show()
-            return
-        }
-        usbFragmentRetryCount++
-        val delay = (USB_RECONNECT_DELAY_MS * usbFragmentRetryCount).coerceAtMost(4000L)
-        val runnable = Runnable {
-            pendingUsbRetryRunnable = null
-            if (cameraSource == CameraSource.USB && !simulate && !isFinishing && !isDestroyed) {
-                startUsbCamera()
-            }
-        }
-        pendingUsbRetryRunnable = runnable
-        mainHandler.postDelayed(runnable, delay)
     }
 
     private val simTick = object : Runnable {
@@ -1612,44 +1111,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
-    override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-        exoPlayer?.setVideoSurface(Surface(surface))
-    }
-
-    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {}
-
-    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-        exoPlayer?.clearVideoSurface()
-        return true
-    }
-
-    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
-        try {
-            if (cameraSource == CameraSource.WIFI && autoDetect) {
-                val bmp = b.textureView.bitmap ?: return
-                try {
-                    // ExoPlayer renders to textureView without additional rotation
-                    coordinateMapper.update(bmp.width, bmp.height, 0, b.textureView.width, b.textureView.height)
-                    val snapshot = cfg
-                    val raw = BlobDetector.detectDarkDotCenter(bmp, snapshot)
-                    val result = detectionFilter.filter(raw, snapshot)
-                    if (result is DetectionResult.Success && trackingEnabled) {
-                        val (vx, vy) = coordinateMapper.imageToView(result.x, result.y)
-                        val quality = DetectionQuality(result.circularity, result.contrastRatio, result.sharpness)
-                        onToolPointDetected(vx, vy, quality)
-                    }
-                } finally {
-                    bmp.recycle()
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Texture frame analysis failed", e)
-        }
-    }
-
+    /** One toggle: "Pause" while tracking, "Start" (accented) while paused. */
     private fun updateTrackingButtons() {
-        b.btnTrackStart.isEnabled = !trackingEnabled
-        b.btnTrackStop.isEnabled = trackingEnabled
+        val accent = ContextCompat.getColor(this, R.color.axisight_ring)
+        val neutral = ContextCompat.getColor(this, R.color.axisight_text)
+        b.btnTrack.text = getString(if (trackingEnabled) R.string.track_pause else R.string.track_start)
+        b.btnTrack.setIconResource(if (trackingEnabled) R.drawable.ic_pause else R.drawable.ic_play)
+        b.btnTrack.iconTint = android.content.res.ColorStateList.valueOf(if (trackingEnabled) neutral else accent)
+        b.btnTrack.setTextColor(if (trackingEnabled) neutral else accent)
     }
 
     private fun isNearTargetEdge(x: Float, y: Float): Boolean {
@@ -1659,23 +1128,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     companion object {
-        private const val TAG = "MainActivity"
-        private const val ZOOM_1X = 1f
-        private const val ZOOM_2X = 2f
-        private const val ZOOM_5X = 5f
-        private const val USB_RECONNECT_DELAY_MS = 600L
-        private const val USB_PERMISSION_RETRY_COOLDOWN_MS = 1500L
-        private const val MAX_USB_FRAGMENT_RETRIES = 6
-        private const val MIN_UP_DISTANCE_PX = 40.0
-        private const val MIN_SCALE_DISTANCE_PX = 80.0
-        private const val MAX_COMBINED_ERROR_IN = 0.020
-        const val DEFAULT_KNOWN_INCHES = 0.1181  // Standard 3mm reference (0.015" bore use-case)
-        private const val ROTATION_COVERAGE_BUCKETS = 24
-        private const val MIN_ROTATION_SAMPLES = 40
-        private const val MAX_ROTATION_SAMPLES = 600
-        private const val MIN_ROTATION_COVERAGE_FRACTION = 0.75 // ~270 degrees of the trace
-        private const val MAX_ROTATION_FIT_RMS_PX = 3.0
-
         // Quality-readout tiers (green/yellow/red). Starting points, not empirically
         // tuned against real hardware yet — adjust once field data is available.
         private const val FIT_RMS_GOOD_PX = 1.5
@@ -1684,11 +1136,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         private const val SHARPNESS_OK = 50.0
         private const val SIGNAL_GOOD_PCT = 70.0
         private const val SIGNAL_OK_PCT = 40.0
+        private const val DETECTION_STALE_MS = 1000L
+        private const val QUALITY_TICK_MS = 500L
+        private const val TARGET_PERSIST_DEBOUNCE_MS = 300L
     }
 }
 
-private class SimpleSeek(val on: (Int) -> Unit) : android.widget.SeekBar.OnSeekBarChangeListener {
-    override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) { on(progress) }
-    override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
-    override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
-}

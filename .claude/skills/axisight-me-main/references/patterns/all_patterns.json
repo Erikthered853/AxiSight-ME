@@ -1,0 +1,426 @@
+[
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\auth\\AuthManager.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Observer",
+        "category": "Behavioral",
+        "confidence": 0.6,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\auth\\AuthManager.kt",
+        "class_name": "AuthManager",
+        "method_name": null,
+        "line_number": 9,
+        "evidence": [
+          "Attach method: addAuthStateListener",
+          "Detach method: removeAuthStateListener"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Observer": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\auth\\LoginActivity.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Adapter",
+        "category": "Structural",
+        "confidence": 0.5,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\auth\\LoginActivity.kt",
+        "class_name": "LoginActivity",
+        "method_name": null,
+        "line_number": 22,
+        "evidence": [
+          "Implements interface: AppCompatActivity",
+          "Has 14 interface methods"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Adapter": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\AxisightApp.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Adapter",
+        "category": "Structural",
+        "confidence": 0.5,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\AxisightApp.kt",
+        "class_name": "AxisightApp",
+        "method_name": null,
+        "line_number": 11,
+        "evidence": [
+          "Implements interface: Application",
+          "Has 5 interface methods"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Adapter": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\camera\\UsbCameraController.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Observer",
+        "category": "Behavioral",
+        "confidence": 0.95,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\camera\\UsbCameraController.kt",
+        "class_name": "UsbCameraController",
+        "method_name": null,
+        "line_number": 32,
+        "evidence": [
+          "Attach method: registerPermissionReceiverIfNeeded",
+          "Attach method: registerRecoveryReceiverIfNeeded",
+          "Attach method: registerAttachReceiverIfNeeded",
+          "Attach method: unregisterPermissionReceiverIfNeeded",
+          "Detach method: unregisterPermissionReceiverIfNeeded",
+          "Attach method: unregisterRecoveryReceiverIfNeeded",
+          "Detach method: unregisterRecoveryReceiverIfNeeded",
+          "Attach method: unregisterAttachReceiverIfNeeded",
+          "Detach method: unregisterAttachReceiverIfNeeded"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Observer": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\camera\\WifiCameraSource.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Adapter",
+        "category": "Structural",
+        "confidence": 0.5,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\camera\\WifiCameraSource.kt",
+        "class_name": "WifiCameraSource",
+        "method_name": null,
+        "line_number": 19,
+        "evidence": [
+          "Implements interface: TextureView.SurfaceTextureListener",
+          "Has 10 interface methods"
+        ],
+        "related_classes": []
+      },
+      {
+        "pattern_type": "Observer",
+        "category": "Behavioral",
+        "confidence": 0.65,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\camera\\WifiCameraSource.kt",
+        "class_name": "WifiCameraSource",
+        "method_name": "onSurfaceTextureUpdated",
+        "line_number": null,
+        "evidence": [
+          "Observer method detected: onSurfaceTextureUpdated"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Adapter": 1,
+      "Observer": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\CoordinateMapper.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Observer",
+        "category": "Behavioral",
+        "confidence": 0.65,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\CoordinateMapper.kt",
+        "class_name": "CoordinateMapper",
+        "method_name": "update",
+        "line_number": null,
+        "evidence": [
+          "Observer method detected: update"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Observer": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\DetectionFilter.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "ChainOfResponsibility",
+        "category": "Behavioral",
+        "confidence": 0.6,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\DetectionFilter.kt",
+        "class_name": "DetectionFilter",
+        "method_name": null,
+        "line_number": 26,
+        "evidence": [
+          "Class name suggests handler chain: DetectionFilter"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "ChainOfResponsibility": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Factory",
+        "category": "Creational",
+        "confidence": 0.6,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt",
+        "class_name": "MainActivity",
+        "method_name": "buildCameraController",
+        "line_number": null,
+        "evidence": [
+          "Factory method detected: buildCameraController"
+        ],
+        "related_classes": []
+      },
+      {
+        "pattern_type": "Builder",
+        "category": "Creational",
+        "confidence": 0.7000000000000001,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt",
+        "class_name": "MainActivity",
+        "method_name": null,
+        "line_number": 40,
+        "evidence": [
+          "Has terminal build/create method"
+        ],
+        "related_classes": []
+      },
+      {
+        "pattern_type": "Adapter",
+        "category": "Structural",
+        "confidence": 0.5,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt",
+        "class_name": "MainActivity",
+        "method_name": null,
+        "line_number": 40,
+        "evidence": [
+          "Implements interface: AppCompatActivity",
+          "Has 50 interface methods"
+        ],
+        "related_classes": []
+      },
+      {
+        "pattern_type": "Observer",
+        "category": "Behavioral",
+        "confidence": 0.95,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt",
+        "class_name": "MainActivity",
+        "method_name": null,
+        "line_number": 40,
+        "evidence": [
+          "Notify method: updateCfg",
+          "Attach method: isUsbAttachIntent",
+          "Notify method: updateParamsSummary",
+          "Notify method: updateDeltaReadout",
+          "Notify method: updateQualityReadout",
+          "Notify method: updateTrackingButtons"
+        ],
+        "related_classes": []
+      },
+      {
+        "pattern_type": "Command",
+        "category": "Behavioral",
+        "confidence": 0.5,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\MainActivity.kt",
+        "class_name": "MainActivity",
+        "method_name": null,
+        "line_number": 40,
+        "evidence": [
+          "Has execute method: run()"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Factory": 1,
+      "Builder": 1,
+      "Adapter": 1,
+      "Observer": 1,
+      "Command": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\presentation\\CalibrationViewModel.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Factory",
+        "category": "Creational",
+        "confidence": 0.7,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\presentation\\CalibrationViewModel.kt",
+        "class_name": "Factory",
+        "method_name": null,
+        "line_number": 397,
+        "evidence": [
+          "Class name contains \"Factory\""
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 2,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Factory": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\ui\\UvcFragment.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Factory",
+        "category": "Creational",
+        "confidence": 0.6,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\ui\\UvcFragment.kt",
+        "class_name": "UvcFragment",
+        "method_name": null,
+        "line_number": 41,
+        "evidence": [
+          "Parameterized factory method: newInstance",
+          "Inherits from: CameraFragment"
+        ],
+        "related_classes": [
+          "CameraFragment"
+        ]
+      },
+      {
+        "pattern_type": "Adapter",
+        "category": "Structural",
+        "confidence": 0.5,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\ui\\UvcFragment.kt",
+        "class_name": "UvcFragment",
+        "method_name": null,
+        "line_number": 41,
+        "evidence": [
+          "Implements interface: CameraFragment",
+          "Has 34 interface methods"
+        ],
+        "related_classes": []
+      },
+      {
+        "pattern_type": "Observer",
+        "category": "Behavioral",
+        "confidence": 0.95,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\main\\java\\com\\etrsystems\\axisight\\ui\\UvcFragment.kt",
+        "class_name": "UvcFragment",
+        "method_name": null,
+        "line_number": 41,
+        "evidence": [
+          "Attach method: attachAnalyzer",
+          "Attach method: registerPreviewCallback",
+          "Attach method: unregisterPreviewCallback",
+          "Detach method: unregisterPreviewCallback"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Factory": 1,
+      "Adapter": 1,
+      "Observer": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\test\\java\\com\\etrsystems\\axisight\\AlignmentHistoryStoreTest.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Factory",
+        "category": "Creational",
+        "confidence": 0.6,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\test\\java\\com\\etrsystems\\axisight\\AlignmentHistoryStoreTest.kt",
+        "class_name": "AlignmentHistoryStoreTest",
+        "method_name": "newStore",
+        "line_number": null,
+        "evidence": [
+          "Factory method detected: newStore"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 1,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Factory": 1
+    }
+  },
+  {
+    "file_path": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\test\\java\\com\\etrsystems\\axisight\\BlobDetectorTest.kt",
+    "language": "Kotlin",
+    "patterns": [
+      {
+        "pattern_type": "Adapter",
+        "category": "Structural",
+        "confidence": 0.5,
+        "location": "D:\\AxiSight\\AxiSight-ME-main\\app\\src\\test\\java\\com\\etrsystems\\axisight\\BlobDetectorTest.kt",
+        "class_name": "PlaneImpl",
+        "method_name": null,
+        "line_number": 493,
+        "evidence": [
+          "Implements interface: androidx.camera.core.ImageProxy.PlaneProxy",
+          "Has 3 interface methods"
+        ],
+        "related_classes": []
+      }
+    ],
+    "total_classes": 2,
+    "total_functions": 0,
+    "analysis_depth": "deep",
+    "pattern_summary": {
+      "Adapter": 1
+    }
+  }
+]

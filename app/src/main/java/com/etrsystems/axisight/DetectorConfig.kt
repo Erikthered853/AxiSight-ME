@@ -16,6 +16,10 @@ package com.etrsystems.axisight
  *                                  Detections that jump farther than this reset the consecutive count.
  * @param minContrastRatio          (bgMean - boreMean) / bgMean must exceed this value.
  *                                  Guards against firing on uniform or low-contrast regions.
+ * @param trackingLossFrames        Consecutive missed frames after which [DetectionFilter] treats
+ *                                  the tool as lost: the jump gate is disarmed so the tool can be
+ *                                  re-acquired wherever it reappears (still subject to the
+ *                                  consecutive-frames confirmation).
  */
 data class DetectorConfig(
     val minAreaPx: Int = 20,
@@ -31,4 +35,5 @@ data class DetectorConfig(
     val consecutiveFramesRequired: Int = 3,
     val maxJumpPx: Float = 60f,
     val minContrastRatio: Double = 0.12,
+    val trackingLossFrames: Int = 15,
 )

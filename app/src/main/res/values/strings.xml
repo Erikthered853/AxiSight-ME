@@ -2,32 +2,39 @@
     <string name="app_name">AxiSight</string>
     <string name="sim">Simulate</string>
     <string name="auto">Auto-Detect</string>
+    <string name="calibrate">Calibrate</string>
     <string name="lock">Lock</string>
     <string name="unlock">Unlock</string>
     <string name="track_start">Start</string>
-    <string name="track_stop">Stop</string>
     <string name="track_reset">Reset</string>
-    <string name="internal">Internal</string>
+    <string name="internal">Phone</string>
     <string name="usb">USB</string>
     <string name="wifi">WiFi</string>
-    <string name="wifi_url_hint">rtsp://</string>
     <string name="connect">Connect</string>
-    <string name="label_target_radius">Target Radius (px)</string>
-    <string name="hint_target_radius">e.g. 120</string>
+    <string name="label_target_radius">Radius (px)</string>
     <string name="label_circularity">Minimum Circularity</string>
     <string name="label_kstd">Noise Rejection (kStd)</string>
     <string name="label_contrast">Contrast Sensitivity</string>
-    <string name="label_mm_per_px">in/px</string>
-    <string name="label_known_mm">Known in</string>
-    <string name="hint_mm_per_px">e.g. 0.0010</string>
+    <string name="label_mm_per_px">Inches per pixel</string>
+    <string name="label_known_mm">Known length (in)</string>
     <string name="default_known_mm">0.1181</string>
     <string name="unset_value">unset</string>
-    <string name="params_summary">target r=%1$spx  circ&gt;=%2$s  kStd %3$s  contrast&gt;=%4$s  in/px %5$s</string>
-    <string name="params_summary_initial">target r=0px  circ&gt;=0.50  kStd 0.50  contrast&gt;=0.12  in/px unset</string>
-    <string name="delta_uncalibrated">Delta: calibrate to get inch offsets</string>
-    <string name="delta_waiting_tool">Delta: waiting for tool detection</string>
-    <string name="delta_value">Delta: dX=%1$.4f in  dY=%2$.4f in</string>
+    <string name="params_summary">target r=%1$s px · circ ≥ %2$s · kStd %3$s · contrast ≥ %4$s · in/px %5$s</string>
+    <string name="params_summary_initial">target r=unset · circ ≥ 0.65 · kStd 1.50 · contrast ≥ 0.12 · in/px unset</string>
+    <string name="delta_uncalibrated">Calibrate to get inch offsets</string>
+    <string name="delta_waiting_tool">Waiting for tool detection</string>
+    <string name="delta_value">dX %1$+.4f in dY %2$+.4f in</string>
     <string name="quality_no_signal">Quality: no detection</string>
+    <string name="quality_no_signal_reason">Quality: no detection — %1$s</string>
+    <string name="quality_hint_place_target">tap the video to put the target circle on the tool</string>
+    <string name="quality_hint_no_frames">no image under the target circle yet</string>
+    <string name="quality_hint_no_dark">nothing darker than threshold inside target (lower kStd)</string>
+    <string name="quality_hint_too_small">dark area too small (enlarge target or lower kStd)</string>
+    <string name="quality_hint_too_large">dark area too large (shrink target or raise kStd)</string>
+    <string name="quality_hint_not_circular">dark area not round (raise kStd or tighten target)</string>
+    <string name="quality_hint_low_contrast">low contrast (lower Contrast slider)</string>
+    <string name="quality_hint_confirming">confirming detection…</string>
+    <string name="quality_hint_tracking_stopped">tracking stopped (press Start)</string>
     <string name="zoom_1x">1x</string>
     <string name="zoom_2x">2x</string>
     <string name="zoom_5x">5x</string>
@@ -35,6 +42,7 @@
     <string name="quality_sharp_segment">Sharp %1$.0f</string>
     <string name="quality_signal_segment">Signal %1$.0f%%</string>
     <string name="calibration_step_center">Set Center: tap the true center reference point.</string>
+    <string name="calibration_step_up">Calibration step 2/3: tap point in +Y (up) direction.</string>
     <string name="calibration_step_scale_up">Scale Setup 1/3: tap a point in the +Y (up) direction.</string>
     <string name="calibration_step_scale_1">Scale Setup 2/3: tap first reference point.</string>
     <string name="calibration_step_scale_2">Scale Setup 3/3: tap second reference point (0.1181\" apart).</string>
@@ -45,7 +53,7 @@
     <string name="cal_center_saved">Center saved.</string>
     <string name="calibration_complete">Calibration saved.</string>
     <string name="calibration_failed">Calibration failed. Retry wizard.</string>
-    <string name="calibration_panel_title">Calibration Wizard</string>
+    <string name="calibration_panel_title">Calibration</string>
     <string name="calibration_step_wait_tap">Tap a point for this step, then confirm.</string>
     <string name="calibration_point_captured">Captured: x=%1$.1f y=%2$.1f</string>
     <string name="calibration_quality_pending">Quality: pending final step</string>
@@ -64,18 +72,11 @@
     <string name="calibration_confirm">Confirm</string>
     <string name="calibration_retry">Retry</string>
     <string name="calibration_cancel">Cancel</string>
+    <string name="cal_help">How to Calibrate</string>
+    <string name="cal_help_title">Calibration Guide</string>
+    <string name="cal_help_body" formatted="false">AxiSight needs two things to read out inch offsets: where the spindle centerline is on screen (Center) and how big a pixel is plus which way is up (Scale &amp; Direction).\n\nBefore you start: point the camera at the bore and confirm the tool point is being detected — the Quality readout should show Fit / Sharp / Signal values.\n\n1. SET CENTER\nMoves the crosshair to the spindle centerline.\n• Tap the exact center point on the video, then press Confirm.\n• Or press Auto to average 30 frames of the detected tool point — steadier than tapping.\n\n2. FIND CENTER BY ROTATION (most accurate)\n• Press Start Rotation Capture, then rotate the spindle by hand — slowly, at least 3/4 of a full turn — while the tool tip stays detected.\n• The traced circle is fitted to find the true centerline. Press Finish Rotation Capture, check the fit line (needs 40+ samples, 75%+ coverage, RMS ≤ 3 px), then Confirm.\n\n3. SET SCALE &amp; DIRECTION (requires a saved center)\nConverts pixels to inches and defines the +Y axis.\n• Step 1: tap a point straight up (machine +Y) from center. Farther is better — minimum 40 px.\n• Steps 2–3: tap the two ends of a feature of known length. Use the longest span you can — minimum 80 px.\n• Type the real length into the \"Known in\" field (default 0.1181 in = 3 mm) before confirming the last point.\n• The wizard rejects the result if the estimated error exceeds 0.020 in — retap with longer spans.\n\nTIPS\n• Retry redoes only the current step; Cancel abandons the wizard.\n• Calibration is stored in camera image space, so it survives zoom and screen rotation — but recalibrate whenever the camera is moved.\n• The Delta readout shows dX/dY in inches once both center and scale are set.</string>
     <string name="tuning_title">Detection Parameters</string>
-    <string name="label_nudge_target">Nudge target</string>
-    <string name="btn_nudge_up">▲</string>
-    <string name="btn_nudge_down">▼</string>
-    <string name="btn_nudge_left">◀</string>
-    <string name="btn_nudge_right">▶</string>
-    <string name="btn_radius_minus">−</string>
-    <string name="btn_radius_plus">+</string>
-    <string name="label_radius_nudge">Radius</string>
-    <string name="btn_settings_desc">Toggle detection settings</string>
-    <string name="cal_short">Cal</string>
-    <string name="csv_short">CSV</string>
+    <string name="btn_settings_desc">Detection settings</string>
     <string name="export_points_csv">Export Points CSV</string>
     <string name="log_alignment">Log Alignment</string>
     <string name="export_alignment_history">Export Alignment History</string>
@@ -87,6 +88,22 @@
     <string name="alignment_log_saved">Logged alignment for \"%1$s\".</string>
     <string name="alignment_log_empty">No alignment history yet.</string>
     <string name="alignment_log_export_path">%1$d records in %2$s</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="btn_sign_out_desc">Sign out of AxiSight</string>
     <!-- Replace with the Web client ID from Firebase Console > Authentication > Sign-in method > Google > Web client ID -->
     <string name="default_web_client_id">REPLACE_WITH_FIREBASE_WEB_CLIENT_ID</string>
+    <string name="export">Export</string>
+    <string name="track_pause">Pause</string>
+    <string name="wifi_url_label">RTSP stream URL</string>
+    <string name="readout_title">Offset from center</string>
+    <string name="section_target">Target circle</string>
+    <string name="section_detection">Detection thresholds</string>
+    <string name="section_scale">Scale</string>
+    <string name="btn_close_desc">Close settings</string>
+    <string name="btn_radius_minus_desc">Shrink target circle</string>
+    <string name="btn_radius_plus_desc">Enlarge target circle</string>
+    <string name="btn_nudge_up_desc">Nudge target up</string>
+    <string name="btn_nudge_down_desc">Nudge target down</string>
+    <string name="btn_nudge_left_desc">Nudge target left</string>
+    <string name="btn_nudge_right_desc">Nudge target right</string>
 </resources>

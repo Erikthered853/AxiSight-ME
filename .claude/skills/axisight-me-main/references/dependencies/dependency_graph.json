@@ -1,0 +1,300 @@
+{
+  "nodes": [
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/AlignmentHistoryStore.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/auth/AuthManager.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/auth/BiometricGate.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/auth/LoginActivity.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/AxisightApp.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/BlobDetector.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/CalibrationData.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/camera/CameraController.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/camera/CameraSourceType.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/camera/FrameAnalyzer.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/camera/InternalCameraSource.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/camera/UsbCameraController.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/camera/WifiCameraSource.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/CircleFit.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/CoordinateMapper.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/CsvLogger.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/DetectionFilter.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/DetectionQuality.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/DetectorConfig.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/domain/CalibrationQuality.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/domain/RotationFit.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/OverlayView.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/presentation/CalibrationViewModel.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/ui/SafeAspectRatioTextureView.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/ui/UvcFragment.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/main/java/com/etrsystems/axisight/usb/UsbDeviceUtils.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/test/java/com/etrsystems/axisight/AlignmentHistoryStoreTest.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/test/java/com/etrsystems/axisight/BlobDetectorTest.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/test/java/com/etrsystems/axisight/CalibrationStoreTest.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/test/java/com/etrsystems/axisight/camera/FrameAnalyzerTest.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/test/java/com/etrsystems/axisight/CircleFitTest.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/test/java/com/etrsystems/axisight/CoordinateMapperTest.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/test/java/com/etrsystems/axisight/domain/CalibrationQualityEvaluatorTest.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/test/java/com/etrsystems/axisight/domain/RotationFitEvaluatorTest.kt",
+      "language": "Kotlin"
+    },
+    {
+      "file": "app/src/test/java/com/etrsystems/axisight/presentation/CalibrationViewModelTest.kt",
+      "language": "Kotlin"
+    }
+  ],
+  "edges": [
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/auth/LoginActivity.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "import_type": "import",
+      "line_number": 14
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/camera/FrameAnalyzer.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/BlobDetector.kt",
+      "import_type": "import",
+      "line_number": 7
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/camera/FrameAnalyzer.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/CoordinateMapper.kt",
+      "import_type": "import",
+      "line_number": 8
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/camera/FrameAnalyzer.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/DetectionFilter.kt",
+      "import_type": "import",
+      "line_number": 9
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/camera/FrameAnalyzer.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/DetectionQuality.kt",
+      "import_type": "import",
+      "line_number": 10
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/camera/FrameAnalyzer.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/DetectorConfig.kt",
+      "import_type": "import",
+      "line_number": 12
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/camera/UsbCameraController.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/AxisightApp.kt",
+      "import_type": "import",
+      "line_number": 18
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/camera/UsbCameraController.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/ui/UvcFragment.kt",
+      "import_type": "import",
+      "line_number": 20
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/camera/UsbCameraController.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/usb/UsbDeviceUtils.kt",
+      "import_type": "import",
+      "line_number": 21
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/domain/RotationFit.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/CircleFit.kt",
+      "import_type": "import",
+      "line_number": 3
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/camera/CameraController.kt",
+      "import_type": "import",
+      "line_number": 24
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/camera/CameraSourceType.kt",
+      "import_type": "import",
+      "line_number": 25
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/camera/FrameAnalyzer.kt",
+      "import_type": "import",
+      "line_number": 26
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/camera/InternalCameraSource.kt",
+      "import_type": "import",
+      "line_number": 27
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/camera/UsbCameraController.kt",
+      "import_type": "import",
+      "line_number": 28
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/camera/WifiCameraSource.kt",
+      "import_type": "import",
+      "line_number": 29
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/presentation/CalibrationViewModel.kt",
+      "import_type": "import",
+      "line_number": 32
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/MainActivity.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/ui/UvcFragment.kt",
+      "import_type": "import",
+      "line_number": 33
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/presentation/CalibrationViewModel.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/CalibrationData.kt",
+      "import_type": "import",
+      "line_number": 6
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/presentation/CalibrationViewModel.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/CoordinateMapper.kt",
+      "import_type": "import",
+      "line_number": 8
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/ui/UvcFragment.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/camera/FrameAnalyzer.kt",
+      "import_type": "import",
+      "line_number": 17
+    },
+    {
+      "source": "app/src/main/java/com/etrsystems/axisight/ui/UvcFragment.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/usb/UsbDeviceUtils.kt",
+      "import_type": "import",
+      "line_number": 18
+    },
+    {
+      "source": "app/src/test/java/com/etrsystems/axisight/camera/FrameAnalyzerTest.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/CoordinateMapper.kt",
+      "import_type": "import",
+      "line_number": 3
+    },
+    {
+      "source": "app/src/test/java/com/etrsystems/axisight/camera/FrameAnalyzerTest.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/DetectionFilter.kt",
+      "import_type": "import",
+      "line_number": 4
+    },
+    {
+      "source": "app/src/test/java/com/etrsystems/axisight/camera/FrameAnalyzerTest.kt",
+      "target": "app/src/main/java/com/etrsystems/axisight/DetectorConfig.kt",
+      "import_type": "import",
+      "line_number": 5
+    }
+  ]
+}

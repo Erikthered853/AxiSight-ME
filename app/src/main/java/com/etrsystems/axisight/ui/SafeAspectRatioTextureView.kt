@@ -45,6 +45,9 @@ class SafeAspectRatioTextureView @JvmOverloads constructor(
         return if (h > 0) h else fallbackHeight
     }
 
+    // AUSBC calls getSurface() from its camera thread; the cross-thread SurfaceTexture
+    // read is deliberate (see awaitSurfaceTexture), so lint's thread inference is wrong here.
+    @android.annotation.SuppressLint("WrongThread")
     override fun getSurface(): Surface {
         // surfaceTexture can be null when the view is detached or not yet laid out.
         // Throwing here crashes the AUSBC library with no recovery path.
@@ -77,6 +80,7 @@ class SafeAspectRatioTextureView @JvmOverloads constructor(
      * (TextureView uses volatile/atomic storage internally).
      */
     @WorkerThread
+    @android.annotation.SuppressLint("WrongThread")
     private fun awaitSurfaceTexture(): SurfaceTexture? {
         val deadline = System.currentTimeMillis() + SURFACE_WAIT_TIMEOUT_MS
         while (System.currentTimeMillis() < deadline) {
@@ -92,8 +96,8 @@ class SafeAspectRatioTextureView @JvmOverloads constructor(
         return null
     }
 
-    override fun postUITask(block: () -> Unit) {
-        post { block.invoke() }
+    override fun postUITask(task: () -> Unit) {
+        post { task.invoke() }
     }
 
     override fun onDetachedFromWindow() {

@@ -227,6 +227,8 @@ latest_logs.txt
 
 build_log*.txt
 
+# skill-seekers generated skill output
+output/
 # Device debugging captures — keep out of the repo
 *.logcat
 *_dump*.txt
