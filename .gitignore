@@ -229,3 +229,10 @@ build_log*.txt
 
 # skill-seekers generated skill output
 output/
+# Device debugging captures — keep out of the repo
+*.logcat
+*_dump*.txt
+*_dump*.xml
+usb_*.txt
+usb_*.xml
+window_dump*.xml

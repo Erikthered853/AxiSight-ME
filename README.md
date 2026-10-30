@@ -31,12 +31,36 @@ export JAVA_HOME="/path/to/jdk-17"
 ./gradlew lintDebug
 ```
 
+`gradle.properties` pins `org.gradle.java.home` to Android Studio's bundled JDK on Windows. Override it (or set `JAVA_HOME`) on other machines.
+
+### Install on a phone
+
+```bash
+# USB or wireless ADB (Developer options → Wireless debugging → Pair device with pairing code)
+adb pair <phone-ip>:<pair-port> <code>
+adb connect <phone-ip>:<connect-port>
+
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.etrsystems.axisight/.MainActivity
+```
+
+If `adb install` fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, the phone has a build signed with a different debug key; `adb uninstall com.etrsystems.axisight` first.
+
+### Repository layout
+
+```
+app/src/main/java/com/etrsystems/axisight/   Kotlin sources (see Key Source Files)
+app/src/main/res/                            Layouts, drawables, strings, themes
+app/src/test/                                Robolectric unit tests
+scripts/verify_alignment.{sh,bat}            Check 16 KB page alignment of native libs in a release APK
+```
+
 ---
 
 ## Firebase Setup
 
 1. Create a Firebase project and add the Android app (`com.etrsystems.axisight`)
-2. Download `google-services.json` → place in `app/`
+2. Download `google-services.json` → place in `app/` (it is git-ignored and **not** committed; the build fails without it)
 3. Enable **Email/Password** authentication in Firebase Console
 4. *(Optional)* Enable **Google Sign-In** → copy the Web Client ID into `app/src/main/res/values/strings.xml`:
    ```xml
@@ -156,11 +180,9 @@ The **Export** button opens a menu with three actions:
 
 ---
 
-## Authentication
+## Authentication (dormant)
 
-- `MainActivity` is the launcher; the Firebase login gate (`auth/LoginActivity`, `AuthManager`, `BiometricGate`) is present but currently bypassed
-- Email/password + optional Google Sign-In via Firebase Auth
-- Biometric re-authentication after 5 minutes of idle (`BiometricGate`)
+Firebase Auth code lives in `auth/` (`LoginActivity`, `AuthManager`, `BiometricGate`) but is currently **bypassed**: `MainActivity` is the launcher and nothing starts `LoginActivity`. The Firebase dependencies and a local `app/google-services.json` (gitignored; copy your own from the Firebase Console) are still required because `AxisightApp` initialises Crashlytics/Analytics and the `google-services` Gradle plugin fails without it. To re-enable the gate, make `LoginActivity` the launcher again and route it to `MainActivity` after sign-in.
 
 ---
 
@@ -181,11 +203,14 @@ The **Export** button opens a menu with three actions:
 | `OverlayView.kt` | Overlay rendering, target circle (rescaled on view resize), CircleFit display |
 | `CircleFit.kt` | Centred algebraic least-squares circle fit, plus `fitRobust` with iterative outlier rejection |
 | `DetectorConfig.kt` | All detection tuning parameters |
-| `CalibrationData.kt` + `CalibrationStore.kt` | Calibration model + SharedPreferences persistence |
+| `CalibrationData.kt` | Calibration model + `CalibrationStore` SharedPreferences persistence |
+| `AlignmentHistoryStore.kt` | Append-only `alignment_history.csv` log of dX/dY readings per tool |
+| `CsvLogger.kt` | Per-session runout-point CSV export |
+| `AxisightApp.kt` | Application class: Firebase init, global crash handler |
 | `presentation/CalibrationViewModel.kt` | Calibration wizard state machine (StateFlow + one-shot effects) |
 | `domain/CalibrationQuality.kt`, `domain/RotationFit.kt` | Pure quality gates for manual and rotation calibration |
 | `usb/UsbDeviceUtils.kt` | Shared USB device utilities (isUvc, findFirst, getExtra, attach/detach relevance) |
-| `auth/*` | Firebase Auth login screen, sign-in state, biometric gate |
+| `auth/*` | Firebase Auth login screen, sign-in state, biometric gate (dormant, see above) |
 
 ---
 
