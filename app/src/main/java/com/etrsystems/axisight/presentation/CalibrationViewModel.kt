@@ -30,10 +30,15 @@ import kotlin.math.roundToInt
  * The [coordinateMapper] is owned here (rather than by the activity) so a
  * recreated activity keeps mapping through the same instance the persisted
  * wizard state was built against; camera sources refresh it on every frame.
+ *
+ * [activeSourceProvider] names the camera source currently running (a
+ * CameraSourceType name) so a center captured on one camera never inherits the
+ * scale measured on another; null means "unknown", which keeps legacy behaviour.
  */
 class CalibrationViewModel(
     private val calibrationStore: CalibrationStore,
-    val coordinateMapper: CoordinateMapper = CoordinateMapper()
+    val coordinateMapper: CoordinateMapper = CoordinateMapper(),
+    private val activeSourceProvider: () -> String? = { null }
 ) : ViewModel() {
 
     enum class Step { NONE, CENTER, UP, SCALE_P1, SCALE_P2 }
@@ -59,7 +64,7 @@ class CalibrationViewModel(
 
     sealed interface Effect {
         /** One-shot user feedback message. */
-        data class Message(@StringRes val resId: Int, val isLong: Boolean = false) : Effect
+        data class Message(@param:StringRes val resId: Int, val isLong: Boolean = false) : Effect
 
         /** Center-only calibration persisted; view-space coords for the overlay crosshair. */
         data class CenterSaved(
@@ -303,7 +308,18 @@ class CalibrationViewModel(
     private fun saveCenterOnly(tap: Pair<Float, Float>) {
         val (imgX, imgY) = coordinateMapper.viewToImage(tap.first, tap.second)
         calibrationStore.saveCenter(imgX, imgY)
-        val updated = calibrationStore.load()?.copy(centerX = imgX, centerY = imgY)
+        val storedSource = calibrationStore.loadSourceOrNull()
+        val activeSource = activeSourceProvider()
+        val scaleAppliesHere = storedSource == null || activeSource == null || storedSource == activeSource
+        val updated = if (scaleAppliesHere) {
+            calibrationStore.load()?.copy(centerX = imgX, centerY = imgY)
+        } else {
+            // The stored up-vector/scale were measured on another camera, in that camera's
+            // image space. Keeping them would let the host re-tag them as this source's
+            // calibration and report inch offsets with the wrong scale and direction.
+            calibrationStore.clearScale()
+            null
+        }
         if (updated != null) {
             calibrationStore.save(updated)
         }
@@ -394,13 +410,16 @@ class CalibrationViewModel(
         _effects.trySend(effect)
     }
 
-    class Factory(private val calibrationStore: CalibrationStore) : ViewModelProvider.Factory {
+    class Factory(
+        private val calibrationStore: CalibrationStore,
+        private val activeSourceProvider: () -> String? = { null }
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(CalibrationViewModel::class.java)) {
                 "Unknown ViewModel class: ${modelClass.name}"
             }
-            return CalibrationViewModel(calibrationStore) as T
+            return CalibrationViewModel(calibrationStore, activeSourceProvider = activeSourceProvider) as T
         }
     }
 

@@ -10,6 +10,13 @@ import kotlin.math.*
  *   accepted position, the result is rejected and the consecutive streak is reset.
  *   This kills noise spikes and brief occlusions that produce implausible teleports.
  *
+ *   Two escape hatches stop the gate from locking tracking out permanently:
+ *   - Re-acquisition: if [DetectorConfig.consecutiveFramesRequired] successive far
+ *     detections agree with each other (within maxJumpPx), the tool has genuinely moved
+ *     (or the camera was repositioned) and tracking snaps to the new position.
+ *   - Loss timeout: after [DetectorConfig.trackingLossFrames] consecutive misses the
+ *     tool is considered lost and the next detection is not jump-checked at all.
+ *
  * Layer 2 — Consecutive-frames gate
  *   Requires [DetectorConfig.consecutiveFramesRequired] successive successes (after jump
  *   filtering) before the first detection is published. A single failure resets the count.
@@ -33,34 +40,71 @@ class DetectionFilter(private val alpha: Float = 0.35f) {
     private var hasPublished = false
     private var hasLastGood = false
 
+    // Consecutive raw failures since the last accepted detection.
+    private var missCount = 0
+
+    // Re-acquisition candidate: a far-away position seen on consecutive frames.
+    private var candidateX = 0f
+    private var candidateY = 0f
+    private var candidateCount = 0
+
     /**
      * Filter one frame's detection result.
      *
      * @param result Raw result from [BlobDetector].
      * @param cfg    Current detector config — read for [DetectorConfig.maxJumpPx],
-     *               [DetectorConfig.consecutiveFramesRequired], and
+     *               [DetectorConfig.consecutiveFramesRequired],
+     *               [DetectorConfig.trackingLossFrames] and
      *               [DetectorConfig.smoothingAlpha] (alpha constructor param is the base).
      */
     @Synchronized
     fun filter(result: DetectionResult, cfg: DetectorConfig = DetectorConfig()): DetectionResult {
         if (result !is DetectionResult.Success) {
-            // Any single failure resets the consecutive streak.
-            // Keep lastGood so a recovering signal still gets jump-checked.
+            // Any single failure resets the consecutive streak and any re-acquisition
+            // candidate. lastGood is kept so a briefly occluded tool is still jump-checked,
+            // but a long loss disarms the gate: wherever the tool reappears is legitimate.
             consecutiveCount = 0
+            candidateCount = 0
+            missCount++
+            if (hasLastGood && missCount >= cfg.trackingLossFrames.coerceAtLeast(1)) {
+                hasLastGood = false
+                hasPublished = false
+            }
             return result
         }
+        missCount = 0
 
         // ── Layer 1: Jump filter ────────────────────────────────────────────────
         if (hasLastGood) {
-            val dx = result.x - lastGoodX
-            val dy = result.y - lastGoodY
-            val dist = sqrt(dx * dx + dy * dy)
+            val dist = hypot(result.x - lastGoodX, result.y - lastGoodY)
             if (dist > cfg.maxJumpPx) {
                 consecutiveCount = 0
-                return DetectionResult.Failure(
-                    FailureReason.JUMP_TOO_LARGE,
-                    "Jump %.1fpx > %.1fpx — streak reset".format(dist, cfg.maxJumpPx)
-                )
+                // One frame can never prove a move (that is exactly the teleport the gate
+                // exists to reject), so re-acquisition needs at least two agreeing frames
+                // even when the operator has turned confirmation down to 1.
+                val required = cfg.consecutiveFramesRequired.coerceAtLeast(MIN_REACQUIRE_FRAMES)
+                val agreesWithCandidate = candidateCount > 0 &&
+                    hypot(result.x - candidateX, result.y - candidateY) <= cfg.maxJumpPx
+                if (agreesWithCandidate) {
+                    candidateCount++
+                } else {
+                    candidateX = result.x
+                    candidateY = result.y
+                    candidateCount = 1
+                }
+                if (candidateCount < required) {
+                    return DetectionResult.Failure(
+                        FailureReason.JUMP_TOO_LARGE,
+                        "Jump %.1fpx > %.1fpx — re-acquiring %d/%d".format(dist, cfg.maxJumpPx, candidateCount, required)
+                    )
+                }
+                // The far position has been seen on `required` consecutive frames: the
+                // tool really is there. Snap tracking to it (no EMA blend with the old spot).
+                candidateCount = 0
+                hasPublished = false
+                consecutiveCount = required - 1
+            } else {
+                candidateCount = 0
             }
         }
 
@@ -113,5 +157,13 @@ class DetectionFilter(private val alpha: Float = 0.35f) {
         consecutiveCount = 0
         hasPublished = false
         hasLastGood = false
+        missCount = 0
+        candidateX = 0f
+        candidateY = 0f
+        candidateCount = 0
+    }
+
+    private companion object {
+        const val MIN_REACQUIRE_FRAMES = 2
     }
 }

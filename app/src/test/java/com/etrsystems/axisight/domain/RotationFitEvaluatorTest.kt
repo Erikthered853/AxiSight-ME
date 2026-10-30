@@ -2,6 +2,7 @@ package com.etrsystems.axisight.domain
 
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -29,6 +30,7 @@ class RotationFitEvaluatorTest {
         assertEquals(240f, q.centerY, 0.5f)
         assertTrue(q.rms < 0.1)
         assertEquals(1.0, q.coverageFraction, 1e-9)
+        assertEquals(samples.size, q.inlierCount)
     }
 
     @Test
@@ -55,5 +57,33 @@ class RotationFitEvaluatorTest {
         val arc = circlePoints(0f, 0f, 50f, count = 240, sweepDegrees = 180.0)
         val coverage = RotationFitEvaluator.coverageFraction(arc, 0.0, 0.0)
         assertTrue(coverage in 0.45..0.60)
+    }
+
+    @Test
+    fun `a few glitch samples during the sweep do not fail the fit gate`() {
+        val rnd = Random(3)
+        val clean = circlePoints(cx = 320f, cy = 240f, radius = 100f, count = 90).map { (x, y) ->
+            (x + rnd.nextDouble(-0.5, 0.5).toFloat()) to (y + rnd.nextDouble(-0.5, 0.5).toFloat())
+        }
+        // The detector briefly latched onto a scratch 40px inside the circle, then a reflection.
+        val glitches = listOf(360f to 240f, 362f to 243f, 250f to 300f, 255f to 305f)
+        val samples = clean + glitches
+
+        val q = RotationFitEvaluator.evaluate(samples)
+
+        assertTrue("glitches must be rejected as outliers; rms=${q.rms} inliers=${q.inlierCount}", q.acceptable)
+        assertEquals(320f, q.centerX, 0.5f)
+        assertEquals(240f, q.centerY, 0.5f)
+        assertTrue(q.rms <= 1.0)
+        assertEquals(clean.size, q.inlierCount)
+        assertEquals(samples.size, q.sampleCount)
+    }
+
+    @Test
+    fun `a trace that is mostly garbage is still rejected`() {
+        val rnd = Random(11)
+        val samples = (0 until 80).map { rnd.nextDouble(0.0, 640.0).toFloat() to rnd.nextDouble(0.0, 480.0).toFloat() }
+        val q = RotationFitEvaluator.evaluate(samples)
+        assertFalse(q.acceptable)
     }
 }

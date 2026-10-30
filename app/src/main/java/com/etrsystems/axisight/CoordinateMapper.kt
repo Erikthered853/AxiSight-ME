@@ -33,18 +33,24 @@ class CoordinateMapper {
     val imageToViewScale: Float get() = synchronized(lock) { scale }
 
     /**
-     * @param imageWidth      Width of the raw ImageProxy / Bitmap (before rotation)
-     * @param imageHeight     Height of the raw ImageProxy / Bitmap (before rotation)
+     * @param imageWidth      Width of the raw ImageProxy / Bitmap / NV21 frame (before rotation)
+     * @param imageHeight     Height of the raw ImageProxy / Bitmap / NV21 frame (before rotation)
      * @param rotationDegrees Clockwise degrees to rotate the image to match display orientation
-     * @param viewWidth       Width of the on-screen preview view
-     * @param viewHeight      Height of the on-screen preview view
+     * @param viewWidth       Width of the on-screen preview view the image is FIT_CENTERed into
+     * @param viewHeight      Height of that preview view
+     * @param viewOffsetX     Left edge of that preview view inside the overlay (view-space) frame.
+     *                        Zero when the preview fills the overlay; non-zero for the USB
+     *                        preview, which is an aspect-fitted child centred in its container.
+     * @param viewOffsetY     Top edge of that preview view inside the overlay frame.
      */
     fun update(
         imageWidth: Int,
         imageHeight: Int,
         rotationDegrees: Int,
         viewWidth: Int,
-        viewHeight: Int
+        viewHeight: Int,
+        viewOffsetX: Float = 0f,
+        viewOffsetY: Float = 0f
     ) {
         if (imageWidth <= 0 || imageHeight <= 0 || viewWidth <= 0 || viewHeight <= 0) return
 
@@ -63,8 +69,8 @@ class CoordinateMapper {
         }
 
         val s = min(viewWidth / logW, viewHeight / logH)
-        val ox = (viewWidth - logW * s) / 2f
-        val oy = (viewHeight - logH * s) / 2f
+        val ox = (viewWidth - logW * s) / 2f + viewOffsetX
+        val oy = (viewHeight - logH * s) / 2f + viewOffsetY
 
         synchronized(lock) {
             this.imageWidth = imageWidth

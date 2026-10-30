@@ -527,4 +527,194 @@ class BlobDetectorTest {
             result is DetectionResult.Success || result is DetectionResult.Failure
         )
     }
+
+    // ── NV21 (USB raw frame) overload ────────────────────────────────────────
+
+    /** Converts a bitmap to an NV21 buffer whose Y plane holds the bitmap's luminance. */
+    private fun toNv21(bmp: Bitmap): ByteArray {
+        val w = bmp.width; val h = bmp.height
+        val out = ByteArray(w * h * 3 / 2)
+        for (y in 0 until h) for (x in 0 until w) {
+            val p = bmp.getPixel(x, y)
+            val r = (p shr 16) and 0xFF; val g = (p shr 8) and 0xFF; val b = p and 0xFF
+            out[y * w + x] = (r * 0.299 + g * 0.587 + b * 0.114).toInt().toByte()
+        }
+        java.util.Arrays.fill(out, w * h, out.size, 128.toByte())
+        return out
+    }
+
+    @Test
+    fun `nv21 overload matches bitmap overload on the same frame`() {
+        val bmp = syntheticBitmap(cx = 70, cy = 120, radius = 22)
+        val c = cfg(minArea = 100, maxArea = 20000)
+        val fromBitmap = BlobDetector.detectDarkDotCenter(bmp, c)
+        val fromNv21 = BlobDetector.detectDarkDotCenter(toNv21(bmp), bmp.width, bmp.height, c)
+        assertTrue(fromBitmap is DetectionResult.Success)
+        assertTrue(fromNv21 is DetectionResult.Success)
+        fromBitmap as DetectionResult.Success; fromNv21 as DetectionResult.Success
+        assertEquals(fromBitmap.x, fromNv21.x, 0.5f)
+        assertEquals(fromBitmap.y, fromNv21.y, 0.5f)
+        assertEquals(70f, fromNv21.x, 2f)
+        assertEquals(120f, fromNv21.y, 2f)
+    }
+
+    @Test
+    fun `nv21 overload rejects a buffer too short for its stated size`() {
+        val c = cfg()
+        val result = BlobDetector.detectDarkDotCenter(ByteArray(10), 200, 200, c)
+        assertTrue(result is DetectionResult.Failure)
+        assertEquals(FailureReason.NO_DATA, (result as DetectionResult.Failure).reason)
+    }
+
+    // ── Target-relative area gate ────────────────────────────────────────────
+
+    @Test
+    fun `blob larger than maxArea is accepted when it fits inside the target circle`() {
+        // radius 45 -> area ~6360px, well above maxArea=3000 but inside a r=60 target.
+        // kStd is lowered because the blob covers ~56% of the target region: the
+        // adaptive threshold (mean - kStd*sigma) assumes the dark blob is a minority
+        // of the region, and at kStd=1.0 it drops below the blob's own luminance.
+        val bmp = syntheticBitmap(radius = 45)
+        val base = cfg(minArea = 50, maxArea = 3000, kStd = 0.5)
+        val without = BlobDetector.detectDarkDotCenter(bmp, base)
+        assertEquals(FailureReason.TOO_LARGE, (without as DetectionResult.Failure).reason)
+
+        val withTarget = base.copy(targetCenterX = 100f, targetCenterY = 100f, targetRadiusPx = 60f)
+        val result = BlobDetector.detectDarkDotCenter(bmp, withTarget)
+        assertTrue("blob inside operator target circle should be accepted", result is DetectionResult.Success)
+        result as DetectionResult.Success
+        assertEquals(100f, result.x, 2f)
+        assertEquals(100f, result.y, 2f)
+    }
+
+    // ── Connected-component selection ────────────────────────────────────────
+
+    /** Draws a dark [thickness]-px line from (x0,y0) to (x1,y1) onto [bmp]. */
+    private fun drawScratch(bmp: Bitmap, x0: Int, y0: Int, x1: Int, y1: Int, thickness: Int = 3, lum: Int = 40) {
+        val dark = 0xFF000000.toInt() or (lum shl 16) or (lum shl 8) or lum
+        val steps = maxOf(kotlin.math.abs(x1 - x0), kotlin.math.abs(y1 - y0)).coerceAtLeast(1)
+        for (k in 0..steps) {
+            val x = x0 + (x1 - x0) * k / steps
+            val y = y0 + (y1 - y0) * k / steps
+            for (dy in 0 until thickness) for (dx in 0 until thickness) {
+                val px = x + dx; val py = y + dy
+                if (px in 0 until bmp.width && py in 0 until bmp.height) bmp.setPixel(px, py, dark)
+            }
+        }
+    }
+
+    @Test
+    fun `round hole is found despite a dark scratch inside the target region`() {
+        // Hole r=20 at (100,100) plus a long dark scratch 25px away. Taken together the
+        // dark pixels are far from round; as separate components the hole wins.
+        val bmp = syntheticBitmap(cx = 100, cy = 100, radius = 20)
+        drawScratch(bmp, 40, 135, 170, 150)
+        val c = cfg(minCirc = 0.65, minArea = 50, maxArea = 20000)
+        val result = BlobDetector.detectDarkDotCenter(bmp, c)
+        assertTrue("Expected Success, got $result", result is DetectionResult.Success)
+        val s = result as DetectionResult.Success
+        assertEquals(100f, s.x, 2f)
+        assertEquals(100f, s.y, 2f)
+        assertTrue("hole circularity should be high, was ${s.circularity}", s.circularity > 0.85)
+    }
+
+    @Test
+    fun `hole beats a smaller round speck when both are in the area range`() {
+        val bmp = syntheticBitmap(cx = 100, cy = 100, radius = 20)
+        // Tiny round speck (r=4, area ~50px) well away from the hole.
+        for (y in 0 until bmp.height) for (x in 0 until bmp.width) {
+            val dx = x - 40; val dy = y - 40
+            if (dx * dx + dy * dy <= 16) bmp.setPixel(x, y, 0xFF1E1E1E.toInt())
+        }
+        val c = cfg(minCirc = 0.5, minArea = 20, maxArea = 20000)
+        val result = BlobDetector.detectDarkDotCenter(bmp, c)
+        assertTrue("Expected Success, got $result", result is DetectionResult.Success)
+        val s = result as DetectionResult.Success
+        assertEquals(100f, s.x, 2f)
+        assertEquals(100f, s.y, 2f)
+    }
+
+    @Test
+    fun `scratch alone with no hole is rejected as non-circular`() {
+        val bmp = syntheticBitmap(radius = 0) // background only
+        drawScratch(bmp, 40, 100, 160, 110)
+        val c = cfg(minCirc = 0.65, minArea = 50, maxArea = 20000)
+        val result = BlobDetector.detectDarkDotCenter(bmp, c)
+        assertTrue("Expected Failure, got $result", result is DetectionResult.Failure)
+        assertEquals(FailureReason.NOT_CIRCULAR, (result as DetectionResult.Failure).reason)
+    }
+
+    @Test
+    fun `oversized bore is reported TOO_LARGE rather than a nearby speck being promoted`() {
+        // Bore r=60 (~11300px) far above maxArea=3000; a round r=5 speck is in range.
+        val bmp = syntheticBitmap(cx = 100, cy = 100, radius = 60)
+        for (y in 0 until bmp.height) for (x in 0 until bmp.width) {
+            val dx = x - 20; val dy = y - 20
+            if (dx * dx + dy * dy <= 25) bmp.setPixel(x, y, 0xFF1E1E1E.toInt())
+        }
+        val c = cfg(minCirc = 0.5, minArea = 20, maxArea = 3000, kStd = 0.5)
+        val result = BlobDetector.detectDarkDotCenter(bmp, c)
+        assertTrue("Expected Failure, got $result", result is DetectionResult.Failure)
+        assertEquals(FailureReason.TOO_LARGE, (result as DetectionResult.Failure).reason)
+    }
+
+    // ── Noise tolerance and partial data ─────────────────────────────────────
+
+    /** Adds seeded Gaussian luminance noise (sigma [sigma]) to every pixel of [bmp]. */
+    private fun addNoise(bmp: Bitmap, sigma: Double, seed: Int = 42): Bitmap {
+        val rnd = java.util.Random(seed.toLong())
+        for (y in 0 until bmp.height) for (x in 0 until bmp.width) {
+            val lum = bmp.getPixel(x, y) and 0xFF
+            val noisy = (lum + rnd.nextGaussian() * sigma).roundToInt().coerceIn(0, 255)
+            bmp.setPixel(x, y, 0xFF000000.toInt() or (noisy shl 16) or (noisy shl 8) or noisy)
+        }
+        return bmp
+    }
+
+    @Test
+    fun `heavy sensor noise does not move the detected center`() {
+        // sigma=20 on a 170-level contrast: individual background pixels routinely dip
+        // under the threshold and must be rejected as specks rather than merged into the hole.
+        val bmp = addNoise(syntheticBitmap(cx = 100, cy = 100, radius = 25, dotLuminance = 30, bgLuminance = 200), sigma = 20.0)
+        val c = cfg(minCirc = 0.6, minArea = 100, maxArea = 20000, kStd = 1.0, minContrast = 0.12)
+        val result = BlobDetector.detectDarkDotCenter(bmp, c)
+        assertTrue("Expected Success, got $result", result is DetectionResult.Success)
+        val s = result as DetectionResult.Success
+        assertEquals(100f, s.x, 2f)
+        assertEquals(100f, s.y, 2f)
+        assertTrue("noisy hole should still be round, was ${s.circularity}", s.circularity > 0.8)
+    }
+
+    @Test
+    fun `noise alone with no hole does not produce a detection`() {
+        val bmp = addNoise(syntheticBitmap(radius = 0, bgLuminance = 150), sigma = 25.0)
+        val c = cfg(minCirc = 0.6, minArea = 100, maxArea = 20000, kStd = 1.0, minContrast = 0.12)
+        val result = BlobDetector.detectDarkDotCenter(bmp, c)
+        assertTrue("Pure noise must not be detected as a hole, got $result", result is DetectionResult.Failure)
+    }
+
+    @Test
+    fun `hole clipped by the target circle edge is still located inside the hole`() {
+        // Hole r=25 at (100,100); the operator's target circle only covers its right 80%.
+        val bmp = syntheticBitmap(cx = 100, cy = 100, radius = 25)
+        val c = cfg(minCirc = 0.5, minArea = 100, maxArea = 20000)
+            .copy(targetCenterX = 115f, targetCenterY = 100f, targetRadiusPx = 35f)
+        val result = BlobDetector.detectDarkDotCenter(bmp, c)
+        assertTrue("Expected Success, got $result", result is DetectionResult.Success)
+        val s = result as DetectionResult.Success
+        // Clipping biases the estimate toward the visible side, but it must stay within the hole.
+        assertTrue("x=${s.x} should sit inside the hole", s.x in 95f..115f)
+        assertEquals(100f, s.y, 2f)
+    }
+
+    @Test
+    fun `hole touching the image border is detected without crashing`() {
+        val bmp = syntheticBitmap(cx = 12, cy = 100, radius = 20) // extends past x=0
+        val c = cfg(minCirc = 0.5, minArea = 100, maxArea = 20000)
+        val result = BlobDetector.detectDarkDotCenter(bmp, c)
+        assertTrue("Expected Success, got $result", result is DetectionResult.Success)
+        val s = result as DetectionResult.Success
+        assertEquals(100f, s.y, 2f)
+        assertTrue("x=${s.x} should be near the clipped hole", s.x in 8f..22f)
+    }
 }

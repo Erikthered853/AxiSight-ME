@@ -2,6 +2,7 @@ package com.etrsystems.axisight
 
 import android.content.Context
 import android.graphics.*
+import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.Log
 import android.view.View
@@ -18,10 +19,21 @@ class OverlayView @JvmOverloads constructor(
         Log.d("OverlayView", "Initialized")
     }
 
+    /**
+     * The target circle is kept in view space, so when the view changes size (device
+     * rotation, preview container re-layout) it is scaled proportionally rather than
+     * merely clamped: a circle the operator placed over the bore stays over roughly the
+     * same part of the image instead of being pinned to the old pixel coordinates.
+     */
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         Log.d("OverlayView", "Size Changed: ${w}x${h}")
         if (targetInitialized && w > 0 && h > 0) {
+            if (oldw > 0 && oldh > 0) {
+                targetX *= w.toFloat() / oldw
+                targetY *= h.toFloat() / oldh
+                targetRadiusPx *= minOf(w, h).toFloat() / minOf(oldw, oldh)
+            }
             targetX = targetX.coerceIn(0f, w.toFloat())
             targetY = targetY.coerceIn(0f, h.toFloat())
             val maxRadius = maxOf(24f, minOf(w, h) * 0.5f)
@@ -35,6 +47,12 @@ class OverlayView @JvmOverloads constructor(
 
     var maxPoints = 240
     var mmPerPx: Double? = null
+
+    /** Height of chrome covering the bottom of this view; the fit readout is drawn above it. */
+    var bottomInset = 0f
+        set(value) { field = value; invalidate() }
+
+    private val density = ctx.resources.displayMetrics.density
 
     /** Circle fit over the current point trace, refreshed on every [addPoint] call. */
     var lastFitResult: CircleFit.Result? = null
@@ -80,7 +98,12 @@ class OverlayView @JvmOverloads constructor(
         color = Color.BLUE; style = Paint.Style.STROKE; strokeWidth = 3f
     }
     private val paintText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE; textSize = 32f
+        color = Color.WHITE
+        textSize = 12f * ctx.resources.displayMetrics.scaledDensity
+        typeface = Typeface.MONOSPACE
+    }
+    private val paintTextBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(160, 0, 0, 0); style = Paint.Style.FILL
     }
     private val paintSim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK; style = Paint.Style.FILL
@@ -247,10 +270,19 @@ class OverlayView @JvmOverloads constructor(
             canvas.drawCircle(ccx, ccy, 5f, paintFit)
             val mm = mmPerPx
             val text = if (mm != null)
-                "r=%.1fpx(%.3fmm)  rms=%.2fpx(%.3fmm)".format(rr, rr*mm, res.rms, res.rms*mm)
+                "runout r=%.1fpx (%.3fmm)  rms=%.2fpx (%.3fmm)".format(rr, rr*mm, res.rms, res.rms*mm)
             else
-                "r=%.1fpx  rms=%.2fpx".format(rr, res.rms)
-            canvas.drawText(text, 20f, h - 24f, paintText)
+                "runout r=%.1fpx  rms=%.2fpx".format(rr, res.rms)
+            // Pill above the bottom bar, so it is never hidden under the controls.
+            val pad = 6f * density
+            val baseline = h - bottomInset - 10f * density
+            val textW = paintText.measureText(text)
+            val top = baseline + paintText.ascent() - pad
+            canvas.drawRoundRect(
+                12f * density - pad, top, 12f * density + textW + pad, baseline + paintText.descent() + pad,
+                8f * density, 8f * density, paintTextBg
+            )
+            canvas.drawText(text, 12f * density, baseline, paintText)
         }
     }
 

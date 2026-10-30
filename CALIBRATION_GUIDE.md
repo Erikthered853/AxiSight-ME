@@ -9,7 +9,7 @@ reports the offset in inches. For that it needs two calibrations:
 | **Scale & Direction** | How many inches one pixel spans, and which way is machine +Y | *Set Scale & Direction* |
 
 Until both are set, the Delta readout shows `calibrate to get inch offsets`.
-All three flows live under the **Cal** button. A condensed version of this guide is
+All three flows live under the **Calibrate** button. A condensed version of this guide is
 available in the app itself: **Cal → How to Calibrate**.
 
 ## Before you start
@@ -18,9 +18,15 @@ available in the app itself: **Cal → How to Calibrate**.
   the Quality readout should show live `Fit / Sharp / Signal` values and the overlay
   should be plotting points. Calibrating against a wandering or absent detection wastes
   the effort.
-- If detection is flaky, open the settings panel (gear) and adjust circularity,
+- If detection is flaky, open the settings panel (tune icon, top-right) and adjust circularity,
   noise rejection (kStd), and contrast, or use **Lock** to freeze the detection
   threshold on the current lighting.
+- Size the target circle so the dark bore fills well under half of it. The detection
+  threshold is `mean − kStd × σ` over the pixels inside the circle, which assumes the
+  bore is the minority; a tight circle around a large bore pushes the threshold below
+  the bore itself and nothing is detected. Enlarge the circle or lower kStd if that
+  happens. Anything that fits inside the circle passes the area gate, so a big circle
+  does not reject a big bore.
 - Zoom does not affect calibration — taps are recorded in unzoomed view coordinates —
   but feel free to zoom for visual confirmation.
 
@@ -43,6 +49,11 @@ The operator rotates the spindle by hand while the app traces the detected tool 
 The traced arc is circle-fitted ([least-squares](app/src/main/java/com/etrsystems/axisight/CircleFit.kt));
 the fitted center is the true centerline, independent of tool runout.
 
+The fit tolerates a few bad samples: if the detector briefly latches onto a scratch or a
+reflection during the sweep, those points are discarded as outliers (never more than half
+the trace) and the fit, coverage and RMS are computed from the rest. A trace that is
+mostly noise still fails the gate.
+
 1. **Cal → Find Center by Rotation.**
 2. Press **Start Rotation Capture**.
 3. Rotate the spindle by hand — slowly and steadily, at least ¾ of a full turn.
@@ -55,8 +66,9 @@ the fitted center is the true centerline, independent of tool runout.
 | Requirement | Threshold |
 |---|---|
 | Samples collected | ≥ 40 |
-| Angular coverage | ≥ 75 % (≈ 270°) |
-| Circle-fit RMS error | ≤ 3.0 px |
+| Samples surviving outlier rejection | ≥ 40 |
+| Angular coverage (of surviving samples) | ≥ 75 % (≈ 270°) |
+| Circle-fit RMS error (of surviving samples) | ≤ 3.0 px |
 
 If the gate fails (`Trace too short or noisy`), rotate further and steadier, keep the
 tool tip detected the whole way around, and try again.
@@ -115,7 +127,7 @@ recalibrate per source.
 - The **Delta** readout shows `dX / dY` in inches between the detected tool point and
   the calibrated center, using the calibrated +Y direction.
 - The **in/px** field shows (and lets you hand-edit) the view-space inches-per-pixel.
-- **CSV → Log Alignment** records a labeled `dX/dY` snapshot; **Export Alignment
+- **Export → Log Alignment** records a labeled `dX/dY` snapshot; **Export Alignment
   History** writes the accumulated records to a CSV file.
 
 ## Troubleshooting
@@ -128,3 +140,6 @@ recalibrate per source.
 | `Trace too short or noisy — rotate further/steadier…` | Rotation capture failed the gate | Rotate ≥ ¾ turn, keep detection continuous |
 | `Calibration failed. Retry wizard.` | Internal guard tripped (e.g. zero-length up vector, invalid known length) | Restart the wizard; check the *Known in* value |
 | Delta stuck on `waiting for tool detection` | Calibrated, but no current detection | Re-aim / re-tune detection |
+| Quality shows `confirming` for a long time after moving the camera or tool | Detections are landing far from the last tracked position | Hold still for a few frames: tracking re-acquires once the new position is seen consistently, or automatically after ~½ s with no detection at all |
+| USB preview black, Snackbar offers **Retry** | Camera failed to open/reconnect, or USB permission was denied/not answered | Tap **Retry**, or replug the camera |
+| `Quality: no detection` with a tight target circle | Bore fills most of the circle, so the adaptive threshold collapses | Enlarge the target circle or lower kStd |

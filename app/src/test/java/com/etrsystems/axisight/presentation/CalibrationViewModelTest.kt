@@ -24,8 +24,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 // Plain Application so Robolectric does not boot AxisightApp (which needs Firebase).
+// sdk pinned to 34: Robolectric 4.12 cannot emulate the app's targetSdk 36.
 @RunWith(RobolectricTestRunner::class)
-@Config(application = Application::class)
+@Config(sdk = [34], application = Application::class)
 class CalibrationViewModelTest {
 
     private lateinit var store: CalibrationStore
@@ -70,6 +71,48 @@ class CalibrationViewModelTest {
         assertEquals(340f, centerSaved.viewY, 0f)
         assertNull(centerSaved.updatedData) // no full calibration existed yet
         assertTrue(effects.filterIsInstance<Effect.Message>().any { it.resId == R.string.cal_center_saved })
+    }
+
+    @Test
+    fun `center captured on another camera drops that camera's scale instead of inheriting it`() {
+        // Full calibration measured on the internal camera.
+        store.save(com.etrsystems.axisight.CalibrationData(centerX = 10f, centerY = 20f, upX = 0f, upY = -1f, inchesPerPixel = 0.001))
+        store.saveSource("INTERNAL")
+
+        val usbViewModel = CalibrationViewModel(store, activeSourceProvider = { "USB" })
+        usbViewModel.startCenterCalibration()
+        usbViewModel.handleTap(300f, 400f)
+        usbViewModel.confirmStep(typedKnownInches = null)
+
+        // Center moved, but the internal camera's up-vector/scale are gone rather than
+        // being re-tagged as USB calibration.
+        assertEquals(300f to 400f, store.loadCenterOrNull())
+        assertNull(store.load())
+        val effects = runBlocking {
+            val drained = mutableListOf<Effect>()
+            while (true) {
+                val effect = withTimeoutOrNull(50) { usbViewModel.effects.first() } ?: break
+                drained.add(effect)
+            }
+            drained
+        }
+        assertNull(effects.filterIsInstance<Effect.CenterSaved>().single().updatedData)
+    }
+
+    @Test
+    fun `center captured on the same camera keeps its scale`() {
+        store.save(com.etrsystems.axisight.CalibrationData(centerX = 10f, centerY = 20f, upX = 0f, upY = -1f, inchesPerPixel = 0.001))
+        store.saveSource("USB")
+
+        val usbViewModel = CalibrationViewModel(store, activeSourceProvider = { "USB" })
+        usbViewModel.startCenterCalibration()
+        usbViewModel.handleTap(300f, 400f)
+        usbViewModel.confirmStep(typedKnownInches = null)
+
+        val loaded = store.load()
+        assertNotNull(loaded)
+        assertEquals(300f, loaded!!.centerX, 0f)
+        assertEquals(0.001, loaded.inchesPerPixel, 1e-9)
     }
 
     @Test

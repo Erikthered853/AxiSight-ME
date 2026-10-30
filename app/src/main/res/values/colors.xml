@@ -1,18 +1,36 @@
 <resources>
-    <!-- Dark Tech Palette -->
-    <color name="axisight_bg">#000000</color>
-    <color name="axisight_ring">#00FF41</color>
-    <color name="axisight_orbit">#00882B</color>
-    <color name="axisight_white">#00FF41</color>
-    <color name="axisight_marker">#000000</color>
-    <color name="axisight_surface">#080F08</color>
-    <color name="axisight_accent">#00DDFF</color>
-    <color name="axisight_text">#00FF41</color>
-    <color name="axisight_scrim">#F2000000</color>
-    <color name="axisight_bar_bg">#E8000000</color>
-    <!-- Material3 dark color roles -->
-    <color name="axisight_primary_container">#004D14</color>
-    <color name="axisight_surface_variant">#0D190D</color>
-    <color name="axisight_warn">#FF3B3B</color>
-    <color name="axisight_caution">#FFC400</color>
+    <!-- ── AxiSight palette ─────────────────────────────────────────────────
+         Graphite surfaces, neutral text, one green accent. The camera preview
+         sits on pure black so letterbox bands stay invisible. -->
+
+    <!-- Backgrounds / surfaces -->
+    <color name="axisight_bg">#0B0E11</color>
+    <color name="axisight_marker">#000000</color>          <!-- behind the preview -->
+    <color name="axisight_surface">#151A20</color>
+    <color name="axisight_surface_variant">#1E252D</color>
+    <color name="axisight_outline">#2F3A45</color>
+    <color name="axisight_scrim">#E6151A20</color>         <!-- floating cards -->
+    <color name="axisight_bar_bg">#F20B0E11</color>        <!-- top / bottom bars -->
+
+    <!-- Text -->
+    <color name="axisight_text">#E8EEF2</color>
+    <color name="axisight_text_secondary">#9AA7B2</color>
+    <color name="axisight_white">#E8EEF2</color>           <!-- legacy alias -->
+    <color name="axisight_orbit">#9AA7B2</color>           <!-- legacy alias: secondary text -->
+
+    <!-- Accent (green) -->
+    <color name="axisight_ring">#2BE07A</color>            <!-- primary / "good" -->
+    <color name="axisight_on_primary">#06240F</color>
+    <color name="axisight_primary_container">#0F3D25</color>
+    <color name="axisight_on_primary_container">#9FF0C0</color>
+
+    <!-- Secondary accent (cyan) — calibration markers, crosshair -->
+    <color name="axisight_accent">#38C6FF</color>
+    <color name="axisight_secondary_container">#0E3A4D</color>
+    <color name="axisight_on_secondary_container">#BDEBFF</color>
+
+    <!-- Status -->
+    <color name="axisight_warn">#FF5252</color>
+    <color name="axisight_on_warn">#2A0000</color>
+    <color name="axisight_caution">#FFC107</color>
 </resources>

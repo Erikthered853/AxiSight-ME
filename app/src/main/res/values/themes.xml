@@ -1,54 +1,130 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.AxiSight" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/axisight_ring</item>
-        <item name="colorOnPrimary">@color/axisight_marker</item>
+        <item name="colorOnPrimary">@color/axisight_on_primary</item>
         <item name="colorPrimaryContainer">@color/axisight_primary_container</item>
-        <item name="colorOnPrimaryContainer">@color/axisight_ring</item>
+        <item name="colorOnPrimaryContainer">@color/axisight_on_primary_container</item>
         <item name="colorSecondary">@color/axisight_accent</item>
-        <item name="colorOnSecondary">@color/axisight_marker</item>
+        <item name="colorOnSecondary">@color/axisight_on_primary</item>
+        <item name="colorSecondaryContainer">@color/axisight_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/axisight_on_secondary_container</item>
         <item name="colorSurface">@color/axisight_surface</item>
-        <item name="colorOnSurface">@color/axisight_ring</item>
+        <item name="colorOnSurface">@color/axisight_text</item>
         <item name="colorSurfaceVariant">@color/axisight_surface_variant</item>
-        <item name="colorOnSurfaceVariant">@color/axisight_orbit</item>
+        <item name="colorOnSurfaceVariant">@color/axisight_text_secondary</item>
+        <item name="colorOutline">@color/axisight_outline</item>
+        <item name="colorError">@color/axisight_warn</item>
+        <item name="colorOnError">@color/axisight_on_warn</item>
         <item name="android:windowBackground">@color/axisight_bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@color/axisight_bg</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
-        <!-- Neon green glow shadows -->
-        <item name="android:outlineAmbientShadowColor" tools:targetApi="28">@color/axisight_ring</item>
-        <item name="android:outlineSpotShadowColor" tools:targetApi="28">@color/axisight_ring</item>
-        <!-- Global button styles -->
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
         <item name="materialButtonStyle">@style/Widget.AxiSight.Button</item>
+        <item name="sliderStyle">@style/Widget.AxiSight.Slider</item>
+        <item name="textInputStyle">@style/Widget.AxiSight.TextInput</item>
     </style>
 
-    <!-- Filled neon button — primary actions -->
+    <!-- Filled button — primary actions (Confirm, Connect) -->
     <style name="Widget.AxiSight.Button" parent="Widget.Material3.Button">
         <item name="android:maxLines">1</item>
         <item name="android:textAllCaps">false</item>
-        <item name="android:minHeight">44dp</item>
-        <item name="android:elevation">8dp</item>
-        <item name="android:outlineAmbientShadowColor" tools:targetApi="28">@color/axisight_ring</item>
-        <item name="android:outlineSpotShadowColor" tools:targetApi="28">@color/axisight_ring</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 
-    <!-- Tonal neon button — secondary actions (nudge, reset, cal steps) -->
+    <!-- Tonal button — secondary actions (Retry, Auto, wizard steps) -->
     <style name="Widget.AxiSight.Button.Tonal" parent="Widget.Material3.Button.TonalButton">
         <item name="android:maxLines">1</item>
         <item name="android:textAllCaps">false</item>
-        <item name="android:minHeight">44dp</item>
-        <item name="android:elevation">6dp</item>
-        <item name="android:outlineAmbientShadowColor" tools:targetApi="28">@color/axisight_ring</item>
-        <item name="android:outlineSpotShadowColor" tools:targetApi="28">@color/axisight_ring</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 
-    <!-- Icon-only button (settings gear) -->
+    <!-- Destructive filled button (Cancel wizard) -->
+    <style name="Widget.AxiSight.Button.Danger" parent="Widget.Material3.Button">
+        <item name="android:maxLines">1</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="backgroundTint">@color/axisight_warn</item>
+        <item name="android:textColor">@color/axisight_on_warn</item>
+    </style>
+
+    <!-- Segmented control member (camera source, zoom) -->
+    <style name="Widget.AxiSight.Button.Segment" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="iconSize">16dp</item>
+        <item name="iconPadding">4dp</item>
+        <item name="iconTint">@color/segment_fg</item>
+        <item name="android:textColor">@color/segment_fg</item>
+        <item name="backgroundTint">@color/segment_bg</item>
+        <item name="strokeColor">@color/axisight_outline</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <!-- Bottom action bar member: icon on top, full label underneath -->
+    <style name="Widget.AxiSight.Button.Bar" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:minHeight">56dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">2dp</item>
+        <item name="android:paddingEnd">2dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="iconGravity">top</item>
+        <item name="iconSize">22dp</item>
+        <item name="iconPadding">2dp</item>
+        <item name="iconTint">@color/axisight_text</item>
+        <item name="android:textColor">@color/axisight_text</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <!-- Icon-only button (settings gear, nudge arrows) -->
     <style name="Widget.AxiSight.Button.Icon" parent="Widget.Material3.Button.IconButton">
-        <item name="android:elevation">4dp</item>
+        <item name="iconTint">@color/axisight_text</item>
+    </style>
+
+    <!-- Tonal icon-only button (nudge pad) -->
+    <style name="Widget.AxiSight.Button.Icon.Tonal" parent="Widget.Material3.Button.IconButton.Filled.Tonal">
+        <item name="iconTint">@color/axisight_text</item>
+        <item name="android:minWidth">44dp</item>
+        <item name="android:minHeight">44dp</item>
     </style>
 
     <!-- Text-only button (sign out) -->
     <style name="Widget.AxiSight.Button.Text" parent="Widget.Material3.Button.TextButton">
         <item name="android:maxLines">1</item>
         <item name="android:textAllCaps">false</item>
+    </style>
+
+    <style name="Widget.AxiSight.Slider" parent="Widget.Material3.Slider">
+        <item name="labelBehavior">gone</item>
+    </style>
+
+    <style name="Widget.AxiSight.TextInput" parent="Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+        <item name="boxCornerRadiusTopStart">10dp</item>
+        <item name="boxCornerRadiusTopEnd">10dp</item>
+        <item name="boxCornerRadiusBottomStart">10dp</item>
+        <item name="boxCornerRadiusBottomEnd">10dp</item>
+    </style>
+
+    <!-- Section label inside panels -->
+    <style name="TextAppearance.AxiSight.Section" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textColor">@color/axisight_text_secondary</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textAllCaps">true</item>
     </style>
 </resources>

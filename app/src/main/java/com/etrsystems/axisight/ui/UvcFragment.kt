@@ -1,11 +1,11 @@
 // Kotlin
 package com.etrsystems.axisight.ui
 
-import android.graphics.Bitmap
 import android.hardware.usb.UsbDevice
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.view.LayoutInflater
@@ -13,20 +13,62 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.Toast
-import com.etrsystems.axisight.BlobDetector
-import com.etrsystems.axisight.DetectorConfig
-import com.etrsystems.axisight.DetectionResult
 import com.etrsystems.axisight.R
+import com.etrsystems.axisight.camera.FrameAnalyzer
 import com.etrsystems.axisight.usb.UsbDeviceUtils
+import com.jiangdg.ausbc.MultiCameraClient
 import com.jiangdg.ausbc.base.CameraFragment
 import com.jiangdg.ausbc.callback.ICameraStateCallBack
+import com.jiangdg.ausbc.callback.IPreviewDataCallBack
 import com.jiangdg.ausbc.camera.bean.CameraRequest
 import com.jiangdg.ausbc.widget.IAspectRatio
+import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ * USB (UVC) camera fragment built on AUSBC's [CameraFragment].
+ *
+ * Detection runs on the camera's raw NV21 preview frames (delivered by libuvc through
+ * [IPreviewDataCallBack]) rather than on screenshots of the preview TextureView: no GL
+ * read-back, no ARGB conversion, full camera frame rate, and — because the frame is in
+ * camera image space — the shared [FrameAnalyzer] maps results through the app-wide
+ * CoordinateMapper exactly like the internal camera, so calibration captured on USB is
+ * stored in image space too.
+ *
+ * Frames arrive on libuvc's thread. Each one is handed to a dedicated processing
+ * thread; if that thread is still busy the frame is dropped (keep-latest), so a slow
+ * detection never backs up the camera.
+ *
+ * Two watchdogs report through [CameraStateListener.onUsbCameraError] so the host can
+ * run its bounded reconnect:
+ *  - open watchdog: the camera never reached OPENED within [OPEN_TIMEOUT_MS] of the
+ *    fragment resuming (black preview with no state callback at all);
+ *  - stall watchdog: the camera is open but no frame has arrived for
+ *    [FRAME_STALL_THRESHOLD_MS] (cable bump, camera firmware hang).
+ *
+ * Lifecycle note: AUSBC's CameraFragment opens the camera when its view is created and
+ * only closes it in onDestroyView — it does nothing on pause/resume. So after the app is
+ * backgrounded and resumed the camera is still open and no OPENED callback will arrive;
+ * [onResume] restarts frame processing itself based on the tracked [cameraOpen] state.
+ */
 class UvcFragment : CameraFragment() {
 
-    interface DetectionCallback {
-        fun onPointDetected(x: Float, y: Float, circularity: Double, contrastRatio: Double, sharpness: Double)
+    /** Mirrors InternalCameraSource.Listener for the USB path. */
+    interface FrameListener {
+        /** Gate for running detection at all (auto-detect on, not simulating). Any thread. */
+        fun isAnalysisEnabled(): Boolean
+
+        /** Gate for delivering successful detections (tracking enabled). Any thread. */
+        fun isTrackingEnabled(): Boolean
+
+        /** Called on the main thread with a view-space detection. */
+        fun onToolPointDetected(point: FrameAnalyzer.ViewPoint)
+
+        /**
+         * Called on the PROCESSING thread when a [requestLock] sampled the frame
+         * center, so the new threshold is applied to the shared config before this
+         * same frame is detected. Implementations must be thread-safe.
+         */
+        fun onLockThresholdSampled(threshold: Int)
     }
 
     interface CameraStateListener {
@@ -36,65 +78,76 @@ class UvcFragment : CameraFragment() {
     }
 
     private var textureView: SafeAspectRatioTextureView? = null
-    private var callback: DetectionCallback? = null
+    private var frameAnalyzer: FrameAnalyzer? = null
+    private var frameListener: FrameListener? = null
     private var cameraStateListener: CameraStateListener? = null
     private var targetVendorId: Int = -1
     private var targetProductId: Int = -1
     private var targetDeviceName: String? = null
 
-    // Default to VGA (640x480) for broad USB camera compatibility.
-    private var previewWidth: Int = 640
-    private var previewHeight: Int = 480
+    // Requested preview size. VGA is supported by practically every UVC camera; AUSBC
+    // negotiates the closest supported MJPEG size and the frame callback reports the
+    // size actually delivered, which is what the analyzer uses.
+    private var previewWidth: Int = DEFAULT_PREVIEW_WIDTH
+    private var previewHeight: Int = DEFAULT_PREVIEW_HEIGHT
+
+    // Preview-view geometry in overlay coordinates. Written on the main thread on
+    // every layout pass, read on the processing thread.
+    @Volatile private var viewOffsetX = 0f
+    @Volatile private var viewOffsetY = 0f
+    @Volatile private var viewWidth = 0
+    @Volatile private var viewHeight = 0
+    private val layoutListener = View.OnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+        snapshotViewGeometry(v)
+    }
 
     private var processingThread: HandlerThread? = null
     private var processingHandler: Handler? = null
+    private val frameInFlight = AtomicBoolean(false)
     @Volatile private var isProcessing = false
+    @Volatile private var lockRequested = false
+    @Volatile private var previewCallbackRegistered = false
 
-    // frameBitmap is accessed from both main thread (recycle) and processing thread (read/write).
-    // All access must hold frameBitmapLock.
-    private val frameBitmapLock = Any()
-    private var frameBitmap: Bitmap? = null
+    // Tracked from onCameraState. AUSBC's own isCameraOpened() can block the calling
+    // thread for up to 2 s while the camera object is still being created, so it must
+    // not be consulted from the main thread; this flag is the safe substitute.
+    @Volatile private var cameraOpen = false
 
-    private val detectorConfigRef = java.util.concurrent.atomic.AtomicReference(DetectorConfig())
-    private val detectorConfig get() = detectorConfigRef.get()
-    private fun updateDetectorConfig(block: DetectorConfig.() -> DetectorConfig) { detectorConfigRef.set(detectorConfigRef.get().block()) }
-    private var targetGlobalX: Float? = null
-    private var targetGlobalY: Float? = null
-    private var targetRadiusPx: Float = detectorConfig.targetRadiusPx
-    // Snapshotted on main thread when setTargetCircle() is called; read on processing thread.
-    @Volatile private var textureViewOffsetX: Float = 0f
-    @Volatile private var textureViewOffsetY: Float = 0f
-
-    // Frame-stall detection
+    // Frame-stall detection: fed by the preview callback, checked on the main thread.
     @Volatile private var lastFrameTimestampMs: Long = 0L
-    @Volatile private var consecutiveNullFrames: Int = 0
     private var stallWatchdog: Runnable? = null
-    private val mainHandler = Handler(android.os.Looper.getMainLooper())
+    private var openWatchdog: Runnable? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
-    fun setDetectionCallback(cb: DetectionCallback) {
-        this.callback = cb
+    private val previewCallback = object : IPreviewDataCallBack {
+        override fun onPreviewData(
+            data: ByteArray?,
+            width: Int,
+            height: Int,
+            format: IPreviewDataCallBack.DataFormat
+        ) {
+            onPreviewFrame(data, width, height, format)
+        }
+    }
+
+    /** Wires this fragment's frames into the app's shared detection pipeline. */
+    fun attachAnalyzer(analyzer: FrameAnalyzer, listener: FrameListener) {
+        frameAnalyzer = analyzer
+        frameListener = listener
     }
 
     fun setCameraStateListener(listener: CameraStateListener?) {
         cameraStateListener = listener
     }
 
-    fun setTargetCircle(x: Float, y: Float, radiusPx: Float) {
-        targetGlobalX = x
-        targetGlobalY = y
-        targetRadiusPx = radiusPx
-        // Snapshot view offsets here on the main thread so applyTargetCircleToDetector()
-        // can be called from the processing thread without a data race on View properties.
-        textureViewOffsetX = textureView?.x ?: 0f
-        textureViewOffsetY = textureView?.y ?: 0f
-        applyTargetCircleToDetector()
+    /** Samples the center-pixel luminance on the next processed frame. */
+    fun requestLock() {
+        lockRequested = true
     }
 
-    /** Mirrors the shared detection-tuning sliders (circularity/kStd/contrast) onto this
-     *  fragment's own [detectorConfigRef], since USB frames are processed independently
-     *  of MainActivity's DetectorConfig. */
-    fun setDetectorTuning(minCircularity: Double, kStd: Double, minContrastRatio: Double) {
-        updateDetectorConfig { copy(minCircularity = minCircularity, kStd = kStd, minContrastRatio = minContrastRatio) }
+    /** Cancels a pending [requestLock] that has not been consumed by a frame yet. */
+    fun cancelLockRequest() {
+        lockRequested = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,55 +157,13 @@ class UvcFragment : CameraFragment() {
         targetDeviceName = arguments?.getString(ARG_DEVICE_NAME)
     }
 
-    /**
-     * Toggles target locking.
-     * @param active If true, locks onto the center pixel of the current frame. If false, resets lock.
-     * @return The locked threshold value if locked, or null.
-     */
-    @androidx.annotation.MainThread
-    fun lockTarget(active: Boolean): Int? {
-        if (!active) {
-            updateDetectorConfig { copy(lockedThreshold = null) }
-            return null
-        }
-
-        val bmp = textureView?.bitmap ?: return null
-        val w = bmp.width
-        val h = bmp.height
-        val result = if (w > 0 && h > 0) {
-            val cx = w / 2
-            val cy = h / 2
-            val pixel = bmp.getPixel(cx, cy)
-            val r = (pixel shr 16) and 0xFF
-            val g = (pixel shr 8) and 0xFF
-            val b = pixel and 0xFF
-            val lum = (r * 0.299 + g * 0.587 + b * 0.114).toInt()
-            val margin = 30
-            val thr = (lum + margin).coerceIn(0, 255)
-            updateDetectorConfig { copy(lockedThreshold = thr) }
-            Log.i(TAG, "Target LOCKED: centerLum=$lum, thr=$thr")
-            thr
-        } else {
-            null
-        }
-
-        bmp.recycle()
-        return result
-    }
-
-    private fun recycleFrameBitmap() {
-        synchronized(frameBitmapLock) {
-            frameBitmap?.let { if (!it.isRecycled) it.recycle() }
-            frameBitmap = null
-        }
-    }
-
     override fun getRootView(inflater: LayoutInflater, container: ViewGroup?): View {
         return try {
             val view = inflater.inflate(R.layout.fragment_uvc, container, false)
-            textureView = view.findViewById(R.id.uvc_texture_view)
-            textureView?.setAspectRatio(previewWidth, previewHeight)
-            applyTargetCircleToDetector()
+            textureView = view.findViewById<SafeAspectRatioTextureView>(R.id.uvc_texture_view).also {
+                it.setAspectRatio(previewWidth, previewHeight)
+                it.addOnLayoutChangeListener(layoutListener)
+            }
             Log.d(TAG, "Root view inflated (${previewWidth}x${previewHeight})")
             view
         } catch (e: Exception) {
@@ -205,38 +216,48 @@ class UvcFragment : CameraFragment() {
             .setPreviewFormat(CameraRequest.PreviewFormat.FORMAT_MJPEG)
             .setAspectRatioShow(true)
             .setCaptureRawImage(false)
-            .setRawPreviewData(false)
+            // Deliver decoded NV21 frames to IPreviewDataCallBack for detection.
+            .setRawPreviewData(true)
             .create()
     }
 
     override fun onCameraState(
-        self: com.jiangdg.ausbc.MultiCameraClient.ICamera,
+        self: MultiCameraClient.ICamera,
         code: ICameraStateCallBack.State,
         msg: String?
     ) {
         when (code) {
             ICameraStateCallBack.State.OPENED -> {
                 Log.i(TAG, "Camera opened successfully")
+                cameraOpen = true
+                mainHandler.post { cancelOpenWatchdog() }
+                registerPreviewCallback()
+                startProcessing()
                 dispatchOnMain {
                     Toast.makeText(context, "USB Camera Connected", Toast.LENGTH_SHORT).show()
                     cameraStateListener?.onUsbCameraOpened()
                 }
-                startProcessing()
             }
             ICameraStateCallBack.State.CLOSED -> {
                 Log.i(TAG, "Camera closed")
+                cameraOpen = false
+                mainHandler.post { cancelOpenWatchdog() }
+                unregisterPreviewCallback()
+                stopProcessing()
                 dispatchOnMain {
                     cameraStateListener?.onUsbCameraClosed()
                 }
-                stopProcessing()
             }
             ICameraStateCallBack.State.ERROR -> {
                 Log.e(TAG, "Camera error: $msg")
+                cameraOpen = false
+                mainHandler.post { cancelOpenWatchdog() }
+                unregisterPreviewCallback()
+                stopProcessing()
                 dispatchOnMain {
                     Toast.makeText(context, "Camera Error: $msg", Toast.LENGTH_LONG).show()
                     cameraStateListener?.onUsbCameraError(msg)
                 }
-                stopProcessing()
             }
         }
     }
@@ -244,24 +265,122 @@ class UvcFragment : CameraFragment() {
     override fun onResume() {
         super.onResume()
         startProcessingThread()
+        if (cameraOpen) {
+            // Still open from before the pause: no OPENED callback is coming.
+            startProcessing()
+        } else {
+            scheduleOpenWatchdog()
+        }
     }
 
     override fun onPause() {
+        cancelOpenWatchdog()
         stopProcessing()
         stopProcessingThread()
-        cancelStallWatchdog()
         super.onPause()
     }
 
     override fun onDestroyView() {
+        cancelOpenWatchdog()
+        unregisterPreviewCallback()
         stopProcessing()
         stopProcessingThread()
-        cancelStallWatchdog()
-        recycleFrameBitmap()
+        cameraOpen = false
         // Do NOT null out cameraStateListener here — late AUSBC callbacks
         // must still be deliverable to the activity for error recovery.
+        textureView?.removeOnLayoutChangeListener(layoutListener)
         textureView = null
         super.onDestroyView()
+    }
+
+    // ── Frame delivery ─────────────────────────────────────────────────────
+
+    private fun registerPreviewCallback() {
+        if (previewCallbackRegistered) return
+        addPreviewDataCallBack(previewCallback)
+        previewCallbackRegistered = true
+    }
+
+    private fun unregisterPreviewCallback() {
+        if (!previewCallbackRegistered) return
+        previewCallbackRegistered = false
+        try {
+            removePreviewDataCallBack(previewCallback)
+        } catch (e: Exception) {
+            Log.w(TAG, "removePreviewDataCallBack failed", e)
+        }
+    }
+
+    /** libuvc thread. Hands the frame to the processing thread, dropping it if busy. */
+    private fun onPreviewFrame(
+        data: ByteArray?,
+        width: Int,
+        height: Int,
+        format: IPreviewDataCallBack.DataFormat
+    ) {
+        lastFrameTimestampMs = SystemClock.elapsedRealtime()
+        if (!isProcessing || data == null || width <= 0 || height <= 0) return
+        if (format != IPreviewDataCallBack.DataFormat.NV21) return
+        val listener = frameListener ?: return
+        if (!listener.isAnalysisEnabled()) return
+        if (!frameInFlight.compareAndSet(false, true)) return // still busy: keep latest
+        val handler = processingHandler
+        if (handler == null) {
+            frameInFlight.set(false)
+            return
+        }
+        // AUSBC allocates a fresh array per frame and never mutates it afterwards, so
+        // it can be processed off-thread without a copy.
+        if (!handler.post {
+                try {
+                    processNv21(data, width, height)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Frame processing error", e)
+                } finally {
+                    frameInFlight.set(false)
+                }
+            }
+        ) {
+            frameInFlight.set(false)
+        }
+    }
+
+    /** Processing thread. */
+    private fun processNv21(data: ByteArray, width: Int, height: Int) {
+        val analyzer = frameAnalyzer ?: return
+        val listener = frameListener ?: return
+        if (lockRequested) {
+            // Guard like BlobDetector does: a negotiation glitch can report a frame size
+            // larger than the delivered buffer, and an exception here would eat the lock.
+            if (data.size >= width * height) {
+                lockRequested = false
+                val lum = data[(height / 2) * width + width / 2].toInt() and 0xFF
+                val thr = (lum + LOCK_LUMINANCE_MARGIN).coerceIn(0, 255)
+                Log.i(TAG, "Target LOCKED: centerLum=$lum, thr=$thr")
+                listener.onLockThresholdSampled(thr)
+            } else {
+                Log.w(TAG, "Lock deferred: buffer ${data.size} < ${width}x${height} luma bytes")
+            }
+        }
+        val vw = viewWidth
+        val vh = viewHeight
+        if (vw <= 0 || vh <= 0) return // preview not laid out yet
+
+        val point = analyzer.analyzeNv21Frame(
+            data, width, height,
+            vw, vh, viewOffsetX, viewOffsetY,
+            deliverResult = listener.isTrackingEnabled()
+        )
+        if (point != null) {
+            dispatchOnMain { listener.onToolPointDetected(point) }
+        }
+    }
+
+    private fun snapshotViewGeometry(v: View) {
+        viewOffsetX = v.x
+        viewOffsetY = v.y
+        viewWidth = v.width
+        viewHeight = v.height
     }
 
     /**
@@ -280,111 +399,37 @@ class UvcFragment : CameraFragment() {
         }
     }
 
+    // ── Processing lifecycle ───────────────────────────────────────────────
+
     private fun startProcessingThread() {
         if (processingThread == null) {
-            processingThread = HandlerThread("FrameProcessingThread")
-            processingThread?.start()
+            processingThread = HandlerThread("UsbFrameProcessing").also { it.start() }
             processingHandler = Handler(processingThread!!.looper)
         }
     }
 
     private fun stopProcessingThread() {
+        processingHandler = null
         processingThread?.quitSafely()
         processingThread = null
-        processingHandler = null
-        // Recycle bitmap after thread has stopped to avoid the race between
-        // the processing thread using the bitmap and main thread recycling it.
-        recycleFrameBitmap()
+        frameInFlight.set(false)
     }
 
     private fun startProcessing() {
         if (isProcessing) return
         isProcessing = true
-        consecutiveNullFrames = 0
         lastFrameTimestampMs = SystemClock.elapsedRealtime()
-        scheduleStallWatchdog()
-        processFrame()
+        mainHandler.post { scheduleStallWatchdog() }
     }
 
     private fun stopProcessing() {
         isProcessing = false
         processingHandler?.removeCallbacksAndMessages(null)
-        cancelStallWatchdog()
+        frameInFlight.set(false)
+        mainHandler.post { cancelStallWatchdog() }
     }
 
-    private fun processFrame() {
-        if (!isProcessing) return
-
-        processingHandler?.postDelayed({
-            if (!isProcessing) return@postDelayed
-
-            try {
-                val bmp = obtainFrameBitmap()
-                if (bmp != null) {
-                    consecutiveNullFrames = 0
-                    lastFrameTimestampMs = SystemClock.elapsedRealtime()
-                    processBitmap(bmp)
-                } else {
-                    consecutiveNullFrames++
-                    if (consecutiveNullFrames >= MAX_CONSECUTIVE_NULL_FRAMES) {
-                        Log.w(TAG, "Frame stream lost: $consecutiveNullFrames consecutive null frames")
-                        dispatchOnMain {
-                            cameraStateListener?.onUsbCameraError("Preview frame stream lost")
-                        }
-                        consecutiveNullFrames = 0
-                        return@postDelayed
-                    }
-                    Log.w(TAG, "TextureView bitmap unavailable ($consecutiveNullFrames/$MAX_CONSECUTIVE_NULL_FRAMES)")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Frame processing error", e)
-            } finally {
-                if (isProcessing) processFrame()
-            }
-        }, 66) // ~15 FPS
-    }
-
-    private fun obtainFrameBitmap(): Bitmap? {
-        val tv = textureView ?: return null
-        val w = tv.width
-        val h = tv.height
-        if (w <= 0 || h <= 0) return null
-
-        synchronized(frameBitmapLock) {
-            val reusable = frameBitmap
-            if (reusable == null || reusable.isRecycled || reusable.width != w || reusable.height != h) {
-                reusable?.let { if (!it.isRecycled) it.recycle() }
-                frameBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            }
-            val target = frameBitmap ?: return null
-            return tv.getBitmap(target)
-        }
-    }
-
-    private fun processBitmap(bmp: Bitmap) {
-        try {
-            applyTargetCircleToDetector()
-            val result = BlobDetector.detectDarkDotCenter(bmp, detectorConfig)
-            when (result) {
-                is DetectionResult.Success -> {
-                    Log.d(TAG, "Blob detected at: ${result.x}, ${result.y}")
-                    dispatchOnMain {
-                        val viewX = textureView?.x ?: 0f
-                        val viewY = textureView?.y ?: 0f
-                        callback?.onPointDetected(
-                            result.x + viewX, result.y + viewY,
-                            result.circularity, result.contrastRatio, result.sharpness
-                        )
-                    }
-                }
-                is DetectionResult.Failure -> {
-                    Log.d(TAG, "No blob: ${result.reason} - ${result.debugInfo}")
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Detection error", e)
-        }
-    }
+    // ── Watchdogs (main thread) ────────────────────────────────────────────
 
     private fun scheduleStallWatchdog() {
         cancelStallWatchdog()
@@ -393,12 +438,12 @@ class UvcFragment : CameraFragment() {
             val age = SystemClock.elapsedRealtime() - lastFrameTimestampMs
             if (age >= FRAME_STALL_THRESHOLD_MS) {
                 Log.w(TAG, "Frame stall detected: last frame ${age}ms ago")
+                stopProcessing()
                 dispatchOnMain {
                     cameraStateListener?.onUsbCameraError("Preview stalled (no frames for ${age}ms)")
                 }
             } else {
-                // Re-arm if still processing and no stall yet
-                scheduleStallWatchdog()
+                scheduleStallWatchdog() // re-arm
             }
         }
         stallWatchdog = watchdog
@@ -410,10 +455,27 @@ class UvcFragment : CameraFragment() {
         stallWatchdog = null
     }
 
-    private fun applyTargetCircleToDetector() {
-        val x = targetGlobalX ?: return
-        val y = targetGlobalY ?: return
-        updateDetectorConfig { copy(targetCenterX = x - textureViewOffsetX, targetCenterY = y - textureViewOffsetY, targetRadiusPx = this@UvcFragment.targetRadiusPx) }
+    /**
+     * Reports a camera that silently never opens (no OPENED, CLOSED or ERROR state at
+     * all — typically a black preview after a hot-replug) so the host can reconnect.
+     */
+    private fun scheduleOpenWatchdog() {
+        cancelOpenWatchdog()
+        val watchdog = Runnable {
+            openWatchdog = null
+            if (cameraOpen || !isAdded) return@Runnable
+            Log.w(TAG, "Camera did not open within ${OPEN_TIMEOUT_MS}ms")
+            dispatchOnMain {
+                cameraStateListener?.onUsbCameraError("Camera did not open within ${OPEN_TIMEOUT_MS / 1000}s")
+            }
+        }
+        openWatchdog = watchdog
+        mainHandler.postDelayed(watchdog, OPEN_TIMEOUT_MS)
+    }
+
+    private fun cancelOpenWatchdog() {
+        openWatchdog?.let { mainHandler.removeCallbacks(it) }
+        openWatchdog = null
     }
 
     companion object {
@@ -421,8 +483,11 @@ class UvcFragment : CameraFragment() {
         private const val ARG_VENDOR_ID = "vendor_id"
         private const val ARG_PRODUCT_ID = "product_id"
         private const val ARG_DEVICE_NAME = "device_name"
-        private const val MAX_CONSECUTIVE_NULL_FRAMES = 45  // ~3 seconds at 15fps
-        private const val FRAME_STALL_THRESHOLD_MS = 3000L  // 3 seconds
+        private const val DEFAULT_PREVIEW_WIDTH = 640
+        private const val DEFAULT_PREVIEW_HEIGHT = 480
+        private const val FRAME_STALL_THRESHOLD_MS = 3000L
+        private const val OPEN_TIMEOUT_MS = 10_000L
+        private const val LOCK_LUMINANCE_MARGIN = 30
 
         fun newInstance(vendorId: Int, productId: Int, deviceName: String?): UvcFragment {
             return UvcFragment().apply {

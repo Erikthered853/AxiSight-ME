@@ -5,7 +5,13 @@
       "Bash(JAVA_HOME=\"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\" ./gradlew assembleDebug)",
       "Bash(adb install:*)",
       "Bash(adb uninstall:*)",
-      "Bash(JAVA_HOME=\"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\" ./gradlew compileDebugKotlin)"
+      "Bash(JAVA_HOME=\"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\" ./gradlew compileDebugKotlin)",
+      "Bash(xargs -I{} basename {})",
+      "PowerShell(adb mdns services)",
+      "PowerShell(adb devices -l)",
+      "PowerShell($ip='192.168.137.21'; $open=@\\(\\); $ports=30000..50000; $batch=1000; for\\($i=0;$i -lt $ports.Count;$i+=$batch\\){ $chunk=$ports[$i..\\([Math]::Min\\($i+$batch-1,$ports.Count-1\\)\\)]; $tasks=@{}; foreach\\($p in $chunk\\){ $c=New-Object System.Net.Sockets.TcpClient; $tasks[$p]=@{c=$c;t=$c.ConnectAsync\\($ip,$p\\)} }; Start-Sleep -Milliseconds 400; foreach\\($p in $tasks.Keys\\){ $e=$tasks[$p]; if\\($e.t.IsCompleted -and -not $e.t.IsFaulted -and $e.c.Connected\\){ $open+=$p }; $e.c.Dispose\\(\\) } }; \"OPEN: $\\($open -join ', '\\)\")",
+      "PowerShell(\"== origin/main app sources:\"; git ls-tree -r --name-only origin/main -- app/src/main/java | ForEach-Object { $_ -replace '^app/src/main/java/com/etrsystems/axisight/','' }; \"== versionName on origin/main:\"; git show origin/main:app/build.gradle | Select-String 'versionCode|versionName' | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(\"== plugins/google-services refs on origin/main:\"; git show origin/main:app/build.gradle | Select-String -Pattern 'google|firebase|plugin' | ForEach-Object { $_.Line.Trim\\(\\) }; git show origin/main:build.gradle 2>$null | Select-String -Pattern 'google|firebase' | ForEach-Object { $_.Line.Trim\\(\\) }; git show origin/main:settings.gradle 2>$null | Select-String -Pattern 'google|firebase' | ForEach-Object { $_.Line.Trim\\(\\) }; \"== .gitignore on origin/main:\"; git show origin/main:.gitignore; \"== local google-services.json present:\"; Test-Path app\\\\google-services.json; \"== manifest diff in cleanup commit:\"; git show 924b049 -- app/src/main/AndroidManifest.xml | Select-String '^[+-]' | ForEach-Object Line)"
     ]
   }
 }
